@@ -9,10 +9,11 @@ import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+
 import 'banner_ad_widget.dart';
 import 'skippable_ad_screen.dart';
-import 'dashboard.dart';
 import 'watchlist_service.dart'; 
+// 🔥 ERROR FIXED: Hata diya 'dashboard.dart' import 🔥
 
 const String kTmdbToken =
     'eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiIzZDJkOTExNmM5ZGU3MjA5ZWUyNzdiYjhjYzlhZWVkOCIsIm5iZiI6MTc5MDI2OTE4NC42MjksInN1YiI6IjZhYjU1NzAwNzZiMTg1ODU3MGFjNDM4NSIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.xZJX8fowhVhVJsgl-5wOW6Y7ZfUr9Zu_Ey1qMkhnPd0';
@@ -95,7 +96,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
 
   final List<Map<String, String>> servers = const [
     {'key': 'vidrift', 'name': 'Rift'},
-    {'key': 'vidsrc', 'name': 'Fast'}, // YAHAN FIX KIYA HAI: 'fast' ki jagah actual 'vidsrc' server daal diya hai
+    {'key': 'vidsrc', 'name': 'Fast'}, 
     {'key': 'vidbolt', 'name': 'Bolt'},
     {'key': 'cinezo', 'name': 'Cinezo'},
     {'key': 'hindi-new', 'name': 'Hindi New'},
@@ -244,10 +245,8 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
         NavigationDelegate(
           onPageStarted: (String url) { if (mounted) setState(() => isPageLoading = true); },
           onPageFinished: (String url) {
-            // PantyFlix page: overlay tab hatega jab HannuTV player iframe ready ho ('ready' signal). Live TV (customUrl) pe pehle jaisa.
             if (mounted && widget.customUrl != null) setState(() => isPageLoading = false);
 
-            // YAHAN FIX KIYA HAI: Purani wali aggressive iframe aur hide logic wapas daal di hai
             String jsCode = '''
               document.documentElement.style.backgroundColor = '#000000';
               document.body.style.backgroundColor = '#000000';
@@ -273,7 +272,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                     width: 100vw !important; 
                     height: 100vh !important; 
                 }
-                /* MAIN MAGIC: IFRAME KO FULL SCREEN KARNA JAISE PURANI SETTING MEIN THA */
                 iframe:not([src*="ads"]) {
                     position: fixed !important;
                     top: 0 !important;
@@ -462,10 +460,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
     );
   }
 
-  // =====================================================================
-  // NEW: movie details, cast, ambient colours, watchlist, search, actor popup
-  // (stream / proxy / iframe code se inka koi lena-dena nahi hai)
-  // =====================================================================
   String get _tmdbType =>
       (widget.mediaType == 'tv' || widget.mediaType == 'series') ? 'tv' : 'movie';
 
@@ -493,7 +487,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
     if (mounted) setState(() => isLoadingDetails = false);
   }
 
-  // Movie ke apne backdrops/poster se colours nikaal ke player ke aas-paas glow + page background badalta hai
   Future<void> _buildAmbientPalette(Map<String, dynamic> data) async {
     final List<String> paths = [];
     try {
@@ -930,24 +923,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
   }
 
   @override
-  void dispose() {
-    _hideControlsTimer?.cancel(); 
-    _liveTvAdTimer?.cancel(); 
-    _introAnimController.dispose(); 
-    commentInputController.dispose();
-    _ambientTimer?.cancel();
-    _ambientColor.dispose();
-    SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]); SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual, overlays: SystemUiOverlay.values);
-    super.dispose();
-  }
-
-  Widget _buildFocusableItem({required Widget child, required VoidCallback onTap, BorderRadius? borderRadius}) {
-    return _TvFocusButton(onTap: onTap, borderRadius: borderRadius ?? BorderRadius.circular(8), child: child);
-  }
-
-  Widget _buildTVLayout() { return const Scaffold(backgroundColor: Colors.black, body: Center(child: Text("TV Layout Mode", style: TextStyle(color: Colors.white)))); }
-
-  @override
   Widget build(BuildContext context) {
     if (isTvDevice) return _buildTVLayout(); 
 
@@ -1164,7 +1139,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                                   children: [
                                     Expanded(
                                       child: Container(
-                                        decoration: BoxDecoration(borderRadius: const BorderRadius.vertical(top: Radius.circular(8)), color: Colors.black54, image: imgUrl.isNotEmpty ? DecorationImage(image: NetworkImage(imgUrl), fit: BoxFit.cover) : null),
+                                        decoration: BoxDecoration(borderRadius: const BorderRadius.vertical(top: Radius.circular(8)), color: Colors.black54, image: imgUrl.isNotEmpty ? DecorationImage(image: CachedNetworkImageProvider(imgUrl), fit: BoxFit.cover) : null),
                                         child: Center(child: Icon(isCurrent ? Icons.play_circle_fill : Icons.play_circle_outline, color: isCurrent ? Colors.red : Colors.white70, size: 40)),
                                       ),
                                     ),
@@ -1283,7 +1258,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                               borderRadius: BorderRadius.circular(8),
                               child: Container(
                                 width: 110, margin: const EdgeInsets.only(right: 10),
-                                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Expanded(child: Container(decoration: BoxDecoration(borderRadius: BorderRadius.circular(8), image: DecorationImage(image: NetworkImage(m['posterUrl'] != '' ? m['posterUrl'] : 'https://via.placeholder.com/300x450/222222/888888'), fit: BoxFit.cover)))), const SizedBox(height: 4), Text(m['title'], style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis)]),
+                                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Expanded(child: Container(decoration: BoxDecoration(borderRadius: BorderRadius.circular(8), image: DecorationImage(image: CachedNetworkImageProvider(m['posterUrl'] != '' ? m['posterUrl'] : 'https://via.placeholder.com/300x450/222222/888888'), fit: BoxFit.cover)))), const SizedBox(height: 4), Text(m['title'], style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis)]),
                               ),
                             );
                           },
@@ -1338,7 +1313,6 @@ class _TvFocusButtonState extends State<_TvFocusButton> {
     );
   }
 }
-
 
 // =====================================================================
 // NEW WIDGETS
