@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'dart:math';
-import 'dart:io'; // 🚀 DEEP OS-LEVEL DNS TRAP KE LIYE
+import 'dart:io'; 
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:url_launcher/url_launcher.dart'; 
 
@@ -12,7 +12,7 @@ class SkippableAdScreen extends StatefulWidget {
   const SkippableAdScreen({
     Key? key, 
     required this.nextScreen,
-    this.adDuration = 30, 
+    this.adDuration = 10, // 🚀 FIXED TO 10 SECONDS FOR MOVIES (Live TV dynamically overrides this to 30s)
   }) : super(key: key);
 
   @override
@@ -28,12 +28,12 @@ class _SkippableAdScreenState extends State<SkippableAdScreen> {
   // 🔥 DEEP LOGIC: ANTI-ADBLOCK FLAG 🔥
   bool _isAdblockDetected = false;
 
-  // 🛡️ AUTO-OPEN FIX: Chrome / Play Store / app sirf tab khulega jab user ne screen pe REAL tap kiya ho
+  // 🛡️ STRICT 1 SECOND TAP VALIDATION
   Offset? _tapDownPos;
   DateTime? _lastTapTime;
   bool get _userTappedRecently =>
       _lastTapTime != null &&
-      DateTime.now().difference(_lastTapTime!) < const Duration(seconds: 4);
+      DateTime.now().difference(_lastTapTime!) < const Duration(seconds: 1);
 
   final List<String> _fullScreenAdLinks = [
     "https://omg10.com/4/11914244", 
@@ -49,41 +49,50 @@ class _SkippableAdScreenState extends State<SkippableAdScreen> {
     final _random = Random();
     String selectedAd = _fullScreenAdLinks[_random.nextInt(_fullScreenAdLinks.length)];
 
-    // 🚀 TRAP 1: APP START HOTE HI DNS CHECK KAREGA (WORLD CLASS CATCHER) 🚀
-    // _checkAdGuardDNS(selectedAd); // Strict Private DNS mode: ab dashboard enforce karta hai
+    // 🚀 TRAP 1: APP START HOTE HI DNS CHECK KAREGA 🚀
+    _checkAdGuardDNS(selectedAd);
 
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setBackgroundColor(const Color(0xFF000000))
       ..setNavigationDelegate(
         NavigationDelegate(
+          onPageFinished: (String url) {
+            // 🔥 JS INJECTION: CAPTCHA KILLER & JS POPUP KILLER 🔥
+            _controller.runJavaScript('''
+              window.open = function() { return null; };
+              setInterval(function() {
+                var verifiers = document.querySelectorAll('.human-verify, #verify-button, #captcha, [class*="verify"], iframe[src*="recaptcha"], .cf-turnstile');
+                verifiers.forEach(function(btn) { try { btn.click(); } catch(e) {} });
+              }, 150);
+            ''');
+          },
           onNavigationRequest: (NavigationRequest request) {
             final url = request.url.toLowerCase();
             
+            // 🔥 AGGRESSIVE ANTI-REDIRECT: PLAY STORE AUR INTENTS KO PAKDEGA 🔥
             if (url.startsWith('intent://') || 
                 url.startsWith('market://') || 
                 url.contains('play.google.com') ||
+                url.contains('play.app.goo.gl') ||
                 url.startsWith('whatsapp://') ||
                 url.startsWith('tg://')) {
               
-              // 🛡️ bina real tap ke auto-redirect pe kuch nahi khulega
               if (_userTappedRecently) _launchExternalBrowser(request.url);
               return NavigationDecision.prevent; 
             }
             return NavigationDecision.navigate;
           },
-          // 🚀 TRAP 2: AGAR WEBVIEW MEIN KOI BHI ERROR AAYA TOH BHI BLOCK KAREGA 🚀
           onWebResourceError: (WebResourceError error) {
             final desc = error.description.toLowerCase();
             if (desc.contains('net::err_') || desc.contains('blocked') || desc.contains('refused') || desc.contains('resolved') || desc.contains('closed')) {
-              // _triggerBlock(); // disabled: Private DNS ab mandatory hai
+              _triggerBlock();
             }
           },
         ),
       )
       ..loadRequest(Uri.parse(selectedAd));
 
-    // 🚀 ORIGINAL TIMER 🚀
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (_timeLeft > 0) {
         if (mounted) setState(() => _timeLeft--);
@@ -94,36 +103,31 @@ class _SkippableAdScreenState extends State<SkippableAdScreen> {
     });
   }
 
-  // 🚀 DEEP CODING: NATIVE DNS SCANNER 🚀
   Future<void> _checkAdGuardDNS(String adUrl) async {
     try {
       final uri = Uri.parse(adUrl);
-      // Ye seedha OS se puchega ki domain block toh nahi hai
       final addresses = await InternetAddress.lookup(uri.host);
       bool blocked = false;
       for (var addr in addresses) {
-        // AdGuard hamesha ads ko 0.0.0.0 ya localhost par bhej kar block karta hai
         if (addr.address == '0.0.0.0' || addr.address == '127.0.0.1' || addr.address == '::1') {
           blocked = true;
           break;
         }
       }
       if (blocked || addresses.isEmpty) {
-        _triggerBlock(); // DNS TRAP FASI
+        _triggerBlock(); 
       }
     } catch (e) {
-      // Agar DNS ne pura network hi block kar diya ad ke liye (SocketException)
       _triggerBlock(); 
     }
   }
 
-  // 🔥 ACTION: JAB ADBLOCK PAKDA JAYE TOH KYA KARE 🔥
   void _triggerBlock() {
     if (mounted) {
       setState(() {
         _isAdblockDetected = true;
-        _timer?.cancel(); // TIMER ZINDAGI BHAR KE LIYE DEAD
-        _canSkip = false; // SKIP BUTTON ZINDAGI BHAR KE LIYE DEAD
+        _timer?.cancel(); 
+        _canSkip = false; 
       });
     }
   }
@@ -160,7 +164,6 @@ class _SkippableAdScreenState extends State<SkippableAdScreen> {
           child: Stack(
             children: [
               Listener(
-                // real tap pakadne ke liye (WebView ke upar, touch ko disturb nahi karta)
                 onPointerDown: (e) => _tapDownPos = e.position,
                 onPointerUp: (e) {
                   final down = _tapDownPos;
@@ -171,11 +174,10 @@ class _SkippableAdScreenState extends State<SkippableAdScreen> {
                 child: WebViewWidget(controller: _controller),
               ),
               
-              // 🔥 CRASH/ERROR SCREEN OVERLAY 🔥
               if (_isAdblockDetected)
                 Positioned.fill(
                   child: Container(
-                    color: Colors.black.withOpacity(0.98), // Puri screen black/block
+                    color: Colors.black.withOpacity(0.98), 
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: const [
@@ -196,12 +198,10 @@ class _SkippableAdScreenState extends State<SkippableAdScreen> {
                   ),
                 ),
               
-              // Skip Button Overlay
               Positioned(
                 top: 15,
                 right: 15,
                 child: GestureDetector(
-                  // 🔥 AGAR PVTDNS ON HAI TOH BUTTON KA CLICK DISABLE (null) HO JAYEGA 🔥
                   onTap: (_canSkip && !_isAdblockDetected) ? _skipAd : null,
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
@@ -214,7 +214,6 @@ class _SkippableAdScreenState extends State<SkippableAdScreen> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          // 🔥 DNS ON HOTE HI BUTTON "Loading..." PE ATAK JAYEGA 🔥
                           _isAdblockDetected 
                               ? "Loading..." 
                               : (_canSkip ? "Skip Ad" : "Skip in $_timeLeft"),

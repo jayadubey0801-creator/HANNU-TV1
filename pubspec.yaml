@@ -9,11 +9,16 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  url_launcher: ^6.3.3
+  url_launcher: ^6.3.0
   http: ^1.2.2
   webview_flutter: ^4.10.0
   webview_flutter_android: ^4.7.0
   app_links: ^6.1.1
+  
+  # 🔥 DEEP UI PACKAGES FOR PREMIUM DASHBOARD & AMBIENT COLOR 🔥
+  cached_network_image: ^3.3.1
+  palette_generator: ^0.3.3
+  shimmer: ^3.0.0
   
   # 🔥 Locked to stable version to bypass Kotlin Android crash 🔥
   google_sign_in: ^6.2.2
