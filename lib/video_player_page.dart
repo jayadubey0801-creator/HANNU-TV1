@@ -74,6 +74,8 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
   bool showControls = true;
   Timer? _hideControlsTimer;
   Timer? _liveTvAdTimer; 
+  Timer? _loadingTimeout;
+
 
   bool showIntroAnimation = false;
   late AnimationController _introAnimController;
@@ -218,6 +220,14 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
   void _initStream() {
     setState(() { isPageLoading = true; isVideoPlaying = false; showIntroAnimation = false; });
 
+    // 8 sec timeout: overlay hat jayega (JS ne sab kuch black kar rakha hai)
+    _loadingTimeout?.cancel();
+    if (widget.customUrl == null) {
+      _loadingTimeout = Timer(const Duration(seconds: 8), () {
+        if (mounted && isPageLoading && !isVideoPlaying) setState(() => isPageLoading = false);
+      });
+    }
+
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setBackgroundColor(Colors.black)
@@ -225,7 +235,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
         isTvDevice ? "Mozilla/5.0 (SMART-TV; Linux; Tizen 5.0) AppleWebKit/538.1 (KHTML, like Gecko) Version/5.0 TV Safari/538.1"
                    : "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
       )
-      ..addJavaScriptChannel('VideoState', onMessageReceived: (JavaScriptMessage message) { if (message.message == 'playing' && mounted) _triggerCinematicPlayAnimation(); if (message.message == 'ready' && mounted) setState(() => isPageLoading = false); })
+      ..addJavaScriptChannel('VideoState', onMessageReceived: (JavaScriptMessage message) { if (message.message == 'playing' && mounted) _triggerCinematicPlayAnimation(); if (message.message == 'ready' && mounted) setState(() => isPageLoading = false); if (message.message == 'autoplay_blocked' && mounted) setState(() => isPageLoading = false); })
       ..setNavigationDelegate(
         NavigationDelegate(
           onPageStarted: (String url) { if (mounted) setState(() => isPageLoading = true); },
@@ -235,82 +245,112 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
 
             // YAHAN FIX KIYA HAI: Purani wali aggressive iframe aur hide logic wapas daal di hai
             String jsCode = '''
-              document.documentElement.style.backgroundColor = '#000000';
-              document.body.style.backgroundColor = '#000000';
-              window.open = function() { return null; };
-              window.alert = function() { return true; }; 
-              window.confirm = function() { return true; }; 
+              (function() {
+                if (window.__hannuInit) return;
+                window.__hannuInit = true;
+                var AR = '$currentAspectRatio';
+                window.open = function() { return null; };
+                window.alert = function() { return true; };
+                window.confirm = function() { return true; };
 
-              var style = document.createElement('style');
-              style.innerHTML = `
-                header, nav, .navbar, footer, .footer, .server-select, .logo, a[href*="t.me"], a[href="/"],
-                iframe[src*="ads"], .ad-container, .ads, .popup-overlay, .dmca-notice, h1, h2, h3,
-                .human-verify, #captcha, [class*="verify"] { 
-                    display: none !important; 
-                    opacity: 0 !important; 
-                    pointer-events: none !important; 
-                    visibility: hidden !important; 
-                }
-                body, html { 
-                    background-color: #000000 !important; 
-                    overflow: hidden !important; 
-                    margin: 0 !important; 
-                    padding: 0 !important; 
-                    width: 100vw !important; 
-                    height: 100vh !important; 
-                }
-                /* MAIN MAGIC: IFRAME KO FULL SCREEN KARNA JAISE PURANI SETTING MEIN THA */
-                iframe:not([src*="ads"]) {
-                    position: fixed !important;
-                    top: 0 !important;
-                    left: 0 !important;
-                    width: 100vw !important;
-                    height: 100vh !important;
-                    z-index: 99999 !important;
-                    border: none !important;
-                    background-color: #000000 !important;
-                }
-              `;
-              document.head.appendChild(style);
+                var css = [
+                  'header, nav, .navbar, footer, .footer, .server-select, .logo, a[href*="t.me"], a[href="/"], iframe[src*="ads"], .ad-container, .ads, .popup-overlay, .dmca-notice, h1, h2, h3 { display: none !important; opacity: 0 !important; pointer-events: none !important; visibility: hidden !important; }',
+                  'body, html { background-color: #000000 !important; overflow: hidden !important; margin: 0 !important; padding: 0 !important; width: 100vw !important; height: 100vh !important; }',
+                  'iframe.hannu-ad { display: none !important; }',
+                  'iframe.hannu-player { position: fixed !important; top: 0 !important; left: 0 !important; width: 100vw !important; height: 100vh !important; max-width: none !important; max-height: none !important; z-index: 999999 !important; border: none !important; margin: 0 !important; padding: 0 !important; background-color: #000000 !important; transform: none !important; }',
+                  '.hannu-chain { transform: none !important; filter: none !important; contain: none !important; overflow: visible !important; perspective: none !important; }',
+                  'video { background-color: #000000 !important; object-fit: ' + AR + ' !important; backface-visibility: hidden; transform: translate3d(0,0,0); }',
+                  'video.hannu-main { position: fixed !important; top: 0 !important; left: 0 !important; width: 100vw !important; height: 100vh !important; z-index: 999999 !important; }'
+                ].join(' ');
+                var style = document.createElement('style');
+                style.innerHTML = css;
+                document.head.appendChild(style);
+                document.documentElement.style.backgroundColor = '#000000';
+                if (document.body) document.body.style.backgroundColor = '#000000';
 
-              function hannuReady() {
-                if (window.__hannuReady) return;
-                window.__hannuReady = true;
-                VideoState.postMessage('ready');
-              }
-              function hannuCheck() {
-                if (window.__hannuReady) return;
-                var frames = document.querySelectorAll('iframe:not([src*="ads"])');
-                var entries = performance.getEntriesByType('resource');
-                for (var i = 0; i < frames.length; i++) {
-                  var f = frames[i];
-                  if ((f.src || '').indexOf('http') !== 0) continue;
+                var AD = /ads|adsterra|doubleclick|popads|googlesyndication|histats|propeller|banner|1xbet|bet365|onclick/i;
+
+                function hannuReady() {
+                  if (window.__hannuReady) return;
+                  window.__hannuReady = true;
+                  VideoState.postMessage('ready');
+                }
+                function pickPlayer() {
+                  var best = null, bs = 0, fr = document.querySelectorAll('iframe');
+                  for (var i = 0; i < fr.length; i++) {
+                    var f = fr[i], src = f.src || f.getAttribute('data-src') || '';
+                    if (!src || src.indexOf('http') !== 0) continue;
+                    if (AD.test(src)) { f.classList.add('hannu-ad'); continue; }
+                    var r = f.getBoundingClientRect();
+                    var area = r.width * r.height;
+                    if (f.classList.contains('hannu-player')) area = area * 2 + 1;
+                    if (area > bs && ((r.width >= 200 && r.height >= 100) || f.classList.contains('hannu-player'))) { bs = area; best = f; }
+                  }
+                  return best;
+                }
+                function liftPlayer(f) {
+                  f.classList.add('hannu-player');
+                  f.setAttribute('allowfullscreen', 'true');
+                  f.setAttribute('allow', 'autoplay; fullscreen; encrypted-media; picture-in-picture');
+                  var p = f.parentElement;
+                  while (p && p !== document.body && p !== document.documentElement) { p.classList.add('hannu-chain'); p = p.parentElement; }
                   if (!f.__hannuWatch) {
                     f.__hannuWatch = Date.now();
                     f.addEventListener('load', hannuReady);
                   }
-                  for (var j = 0; j < entries.length; j++) {
-                    if (entries[j].initiatorType === 'iframe' && entries[j].name === f.src) { hannuReady(); break; }
-                  }
                   if (Date.now() - f.__hannuWatch > 6000) hannuReady();
                 }
-              }
-              hannuCheck();
-              setInterval(hannuCheck, 100);
-
-              setInterval(function() {
-                var vids = document.getElementsByTagName('video');
-                if (vids.length > 0) {
-                  var v = vids[0];
-                  v.style.backgroundColor = '#000000';
-                  v.style.objectFit = '$currentAspectRatio';
-                  v.style.position = 'fixed';
-                  v.style.top = '0'; v.style.left = '0'; v.style.width = '100vw'; v.style.height = '100vh'; v.style.zIndex = '999999';
-                  if (v.currentTime > 0.5 && !v.paused) VideoState.postMessage('playing');
+                function findVideo(doc, depth) {
+                  try {
+                    var vs = doc.getElementsByTagName('video');
+                    if (vs.length) return vs[0];
+                    if (depth > 4) return null;
+                    var fr = doc.getElementsByTagName('iframe');
+                    for (var i = 0; i < fr.length; i++) {
+                      var d = null;
+                      try { d = fr[i].contentDocument; } catch (e) {}
+                      if (d) { var r = findVideo(d, depth + 1); if (r) return r; }
+                    }
+                  } catch (e) {}
+                  return null;
                 }
-                var playBtns = document.querySelectorAll('.play-btn, .vjs-big-play-button, .play-icon, #play-button');
-                playBtns.forEach(function(b) { b.click(); });
-              }, 200);
+                function tryPlay(v) {
+                  if (v.__hannuTried) return;
+                  v.__hannuTried = true;
+                  try {
+                    var p = v.play();
+                    if (p && p.catch) p.catch(function() { VideoState.postMessage('autoplay_blocked'); });
+                  } catch (e) { VideoState.postMessage('autoplay_blocked'); }
+                }
+
+                var sent = false;
+                setInterval(function() {
+                  var f = pickPlayer();
+                  if (f) liftPlayer(f);
+                  var v = findVideo(document, 0);
+                  if (v) {
+                    if (!f) v.classList.add('hannu-main');
+                    tryPlay(v);
+                    if (!sent && v.currentTime > 0.1 && !v.paused) { sent = true; VideoState.postMessage('playing'); }
+                  }
+                  var playBtns = document.querySelectorAll('.play-btn, .vjs-big-play-button, .play-icon, #play-button');
+                  playBtns.forEach(function(b) { b.click(); });
+                }, 200);
+
+                var SEL = ['.human-verify', '#verify-button', 'button[id*="verify"]', 'button[class*="verify"]', '[class*="verify"] button', '[class*="verify"] input[type="checkbox"]', '#captcha button'];
+                setInterval(function() {
+                  SEL.forEach(function(s) {
+                    var els = [];
+                    try { els = document.querySelectorAll(s); } catch (e) {}
+                    els.forEach(function(el) {
+                      if (el.__hannuClicked) return;
+                      if (el.tagName === 'A' && el.href && el.href.indexOf(location.host) < 0) return;
+                      el.__hannuClicked = true;
+                      try { el.click(); } catch (e) {}
+                    });
+                  });
+                }, 700);
+              })();
             ''';
             _controller.runJavaScript(jsCode);
           },
@@ -364,6 +404,12 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
       String safeFinalUrl = vercelProxyBase + Uri.encodeComponent(originalTargetUrl);
       
       _controller.loadRequest(Uri.parse(safeFinalUrl));
+    }
+
+    // Mobile data pe autoplay block hat jaye (Android WebView)
+    final platformCtrl = _controller.platform;
+    if (platformCtrl is AndroidWebViewController) {
+      platformCtrl.setMediaPlaybackRequiresUserGesture(false);
     }
   }
 
@@ -529,6 +575,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
   void dispose() {
     _hideControlsTimer?.cancel(); 
     _liveTvAdTimer?.cancel(); 
+    _loadingTimeout?.cancel();
     _introAnimController.dispose(); 
     commentInputController.dispose();
     SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]); SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual, overlays: SystemUiOverlay.values);

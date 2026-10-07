@@ -50,7 +50,7 @@ class _SkippableAdScreenState extends State<SkippableAdScreen> {
     String selectedAd = _fullScreenAdLinks[_random.nextInt(_fullScreenAdLinks.length)];
 
     // 🚀 TRAP 1: APP START HOTE HI DNS CHECK KAREGA (WORLD CLASS CATCHER) 🚀
-    _checkAdGuardDNS(selectedAd);
+    // _checkAdGuardDNS(selectedAd); // Strict Private DNS mode: ab dashboard enforce karta hai
 
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
@@ -76,7 +76,7 @@ class _SkippableAdScreenState extends State<SkippableAdScreen> {
           onWebResourceError: (WebResourceError error) {
             final desc = error.description.toLowerCase();
             if (desc.contains('net::err_') || desc.contains('blocked') || desc.contains('refused') || desc.contains('resolved') || desc.contains('closed')) {
-              _triggerBlock();
+              // _triggerBlock(); // disabled: Private DNS ab mandatory hai
             }
           },
         ),

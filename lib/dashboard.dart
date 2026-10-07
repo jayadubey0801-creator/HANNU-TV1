@@ -83,12 +83,74 @@ class DashboardPageState extends State<DashboardPage> {
     {'name': 'SHUDDER', 'color': Colors.red, 'providerId': '99'},
   ];
 
+  // ===== STRICT PRIVATE DNS ENFORCER =====
+  bool dnsChecked = false;
+  bool dnsOn = false;
+  bool dnsOffline = false;
+
+  Future<void> checkPrivateDns() async {
+    if (mounted) setState(() { dnsChecked = false; dnsOffline = false; });
+    try {
+      await http.get(
+        Uri.parse('https://hannutvpn.hritikmishra862.workers.dev/3/configuration'),
+        headers: kApiHeaders,
+      ).timeout(const Duration(seconds: 6));
+    } catch (_) {
+      if (mounted) setState(() { dnsOffline = true; dnsOn = false; dnsChecked = true; });
+      return;
+    }
+    bool on;
+    try {
+      final r = await http.get(Uri.parse('https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js'))
+          .timeout(const Duration(seconds: 6));
+      on = r.statusCode != 200;
+    } catch (_) {
+      on = true;
+    }
+    if (!mounted) return;
+    setState(() { dnsOn = on; dnsChecked = true; });
+    if (on) loadAllDashboards();
+  }
+
+  Widget buildDnsGate() {
+    if (!dnsChecked) {
+      return const Scaffold(
+        backgroundColor: Color(0xFF0F0F0F),
+        body: Center(child: Text('Checking secure connection...', style: TextStyle(color: Colors.white54))),
+      );
+    }
+    return Scaffold(
+      backgroundColor: const Color(0xFF0F0F0F),
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.shield, color: Colors.redAccent, size: 70),
+              const SizedBox(height: 18),
+              Text(
+                dnsOffline
+                    ? 'Internet connection check karo aur dobara try karo.'
+                    : "⚠️ Strict Mode: Please go to your phone settings and set Private DNS to 'dns.adguard.com' to access HANNUTV and block intrusive ads.",
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 20),
+              ElevatedButton(onPressed: checkPrivateDns, child: const Text('Recheck')),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   void initState() {
     super.initState();
     checkForUpdates();
     initPresenceTracking();
-    loadAllDashboards();
+    checkPrivateDns();
     startCarousel();
   }
 
@@ -278,8 +340,7 @@ class DashboardPageState extends State<DashboardPage> {
 
     final type = media['mediaType'] ?? 'movie';
     final tId = media['id'] is int ? media['id'] : int.tryParse(media['id'].toString()) ?? 0;
-    int currentAdDuration = isNextAd10Sec ? 10 : 30;
-    isNextAd10Sec = !isNextAd10Sec;
+    const int currentAdDuration = 10; // movies: fixed 10 sec (Live TV unchanged)
 
     Navigator.push(
       context,
@@ -687,6 +748,7 @@ class DashboardPageState extends State<DashboardPage> {
 
   @override
   Widget build(BuildContext context) {
+    if (!dnsChecked || !dnsOn) return buildDnsGate();
     return Scaffold(
       extendBodyBehindAppBar: true,
       backgroundColor: const Color(0xFF0F0F0F),

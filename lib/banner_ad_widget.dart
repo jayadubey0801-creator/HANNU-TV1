@@ -65,7 +65,7 @@ class _CustomBannerAdState extends State<CustomBannerAd> {
                 desc.contains('err_connection_refused')) {
               if (mounted) {
                 setState(() {
-                  _isAdblockDetected = true; // Error set
+                  // _isAdblockDetected = true; // disabled: Private DNS ab mandatory hai
                 });
               }
             }
