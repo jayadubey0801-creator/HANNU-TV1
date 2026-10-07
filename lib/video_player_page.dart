@@ -9,9 +9,11 @@ import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+// 🔥 ERROR FIXED: Yahan CachedNetworkImage ka import add kiya hai 🔥
+import 'package:cached_network_image/cached_network_image.dart';
+
 import 'banner_ad_widget.dart';
 import 'skippable_ad_screen.dart';
-// 🔥 ERROR FIXED: Yahan se 'dashboard.dart' ka purana import hata diya hai 🔥
 import 'watchlist_service.dart'; 
 
 const String kTmdbToken =
@@ -95,7 +97,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
 
   final List<Map<String, String>> servers = const [
     {'key': 'vidrift', 'name': 'Rift'},
-    {'key': 'vidsrc', 'name': 'Fast'}, // YAHAN FIX KIYA HAI: 'fast' ki jagah actual 'vidsrc' server daal diya hai
+    {'key': 'vidsrc', 'name': 'Fast'}, 
     {'key': 'vidbolt', 'name': 'Bolt'},
     {'key': 'cinezo', 'name': 'Cinezo'},
     {'key': 'hindi-new', 'name': 'Hindi New'},
@@ -244,6 +246,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
         NavigationDelegate(
           onPageStarted: (String url) { if (mounted) setState(() => isPageLoading = true); },
           onPageFinished: (String url) {
+            // PantyFlix page: overlay tab hatega jab HannuTV player iframe ready ho ('ready' signal). Live TV (customUrl) pe pehle jaisa.
             if (mounted && widget.customUrl != null) setState(() => isPageLoading = false);
 
             String jsCode = '''
@@ -752,7 +755,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                       CircleAvatar(
                         radius: 34,
                         backgroundColor: Colors.grey[900],
-                        backgroundImage: hasPhoto ? NetworkImage('https://image.tmdb.org/t/p/w185$profile') : null,
+                        backgroundImage: hasPhoto ? CachedNetworkImageProvider('https://image.tmdb.org/t/p/w185$profile') : null,
                         child: hasPhoto ? null : const Icon(Icons.person, color: Colors.white38, size: 30),
                       ),
                       const SizedBox(height: 6),
@@ -922,7 +925,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
     }
   }
 
-  // 🔥 BHAI YEH MISSING TEEN FUNCTIONS MAINE WAPIS DAAL DIYE HAIN 🔥
   @override
   void dispose() {
     _hideControlsTimer?.cancel(); 
@@ -942,7 +944,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
   Widget _buildTVLayout() { 
     return const Scaffold(backgroundColor: Colors.black, body: Center(child: Text("TV Layout Mode", style: TextStyle(color: Colors.white)))); 
   }
-  // 🔥 INKE BINA FLUTTER CONFUSE HO RAHA THA 🔥
 
   @override
   Widget build(BuildContext context) {
@@ -1536,14 +1537,14 @@ class _SearchSheetState extends State<_SearchSheet> {
         ? CircleAvatar(
             radius: 26,
             backgroundColor: Colors.grey[900],
-            backgroundImage: img.isNotEmpty ? NetworkImage('https://image.tmdb.org/t/p/w185$img') : null,
+            backgroundImage: img.isNotEmpty ? CachedNetworkImageProvider('https://image.tmdb.org/t/p/w185$img') : null,
             child: img.isEmpty ? const Icon(Icons.person, color: Colors.white38) : null,
           )
         : ClipRRect(
             borderRadius: BorderRadius.circular(6),
             child: img.isNotEmpty
-                ? Image.network('https://image.tmdb.org/t/p/w185$img', width: 46, height: 68, fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(width: 46, height: 68, color: Colors.grey[900], child: const Icon(Icons.movie, color: Colors.white24)))
+                ? CachedNetworkImage(imageUrl: 'https://image.tmdb.org/t/p/w185$img', width: 46, height: 68, fit: BoxFit.cover,
+                    errorWidget: (_, __, ___) => Container(width: 46, height: 68, color: Colors.grey[900], child: const Icon(Icons.movie, color: Colors.white24)))
                 : Container(width: 46, height: 68, color: Colors.grey[900], child: const Icon(Icons.movie, color: Colors.white24)),
           );
 
@@ -1768,7 +1769,7 @@ class _ActorSheetState extends State<_ActorSheet> {
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(8),
                     child: poster.isNotEmpty
-                        ? Image.network('https://image.tmdb.org/t/p/w342$poster', fit: BoxFit.cover, errorBuilder: (_, __, ___) => _posterFallback())
+                        ? CachedNetworkImage(imageUrl: 'https://image.tmdb.org/t/p/w342$poster', fit: BoxFit.cover, errorWidget: (_, __, ___) => _posterFallback())
                         : _posterFallback(),
                   ),
                 ),
@@ -1843,7 +1844,7 @@ class _ActorSheetState extends State<_ActorSheet> {
                     ClipRRect(
                       borderRadius: BorderRadius.circular(12),
                       child: profile.isNotEmpty
-                          ? Image.network('https://image.tmdb.org/t/p/w342$profile', width: 90, height: 130, fit: BoxFit.cover, errorBuilder: (_, __, ___) => _avatarFallback())
+                          ? CachedNetworkImage(imageUrl: 'https://image.tmdb.org/t/p/w342$profile', width: 90, height: 130, fit: BoxFit.cover, errorWidget: (_, __, ___) => _avatarFallback())
                           : _avatarFallback(),
                     ),
                     const SizedBox(width: 14),
