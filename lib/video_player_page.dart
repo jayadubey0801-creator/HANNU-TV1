@@ -4,16 +4,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart'; // 🚀 FOR LOCAL GUEST WATCHLIST
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:palette_generator/palette_generator.dart';
 
 import 'banner_ad_widget.dart';
 import 'skippable_ad_screen.dart';
-import 'dashboard.dart'; 
 
 const String kTmdbToken =
     'eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiIzZDJkOTExNmM5ZGU3MjA5ZWUyNzdiYjhjYzlhZWVkOCIsIm5iZiI6MTc5MDI2OTE4NC42MjksInN1YiI6IjZhYjU1NzAwNzZiMTg1ODU3MGFjNDM4NSIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.xZJX8fowhVhVJsgl-5wOW6Y7ZfUr9Zu_Ey1qMkhnPd0';
@@ -77,7 +76,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
   bool isDescriptionExpanded = false;
   Timer? _hideControlsTimer;
   Timer? _liveTvAdTimer; 
-  Timer? _fallbackPlayTimer; 
 
   bool showIntroAnimation = false;
   late AnimationController _introAnimController;
@@ -86,20 +84,18 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
 
   final TextEditingController commentInputController = TextEditingController();
 
-  // 🔥 DEEP SERVER MAPPING EXACTLY AS REQUESTED 🔥
   final List<Map<String, String>> servers = const [
-    {'key': 'vidrift', 'name': 'Rift'},          
-    {'key': 'bingr', 'name': 'Fast'},           
-    {'key': 'vidcore', 'name': 'Fast (Ads)'},   
-    {'key': 'vidbolt', 'name': 'Bolt'},           
-    {'key': 'cinezo', 'name': 'Cinezo'},          
-    {'key': 'peachify', 'name': 'Peach'},       
-    {'key': 'vidlink', 'name': 'Mega'},           
-    {'key': 'vidfast', 'name': 'Alpha'},          
-    {'key': 'vidrock', 'name': 'Orion'},         
-    {'key': 'hindi-new', 'name': 'Hindi New'},   
-    {'key': 'screenscape', 'name': 'Hindi'},      
-    {'key': 'zxcstream', 'name': 'Vidgod'},      
+    {'key': 'vidrift', 'name': 'Rift'},
+    {'key': 'vidsrc', 'name': 'Fast'}, 
+    {'key': 'vidbolt', 'name': 'Bolt'},
+    {'key': 'cinezo', 'name': 'Cinezo'},
+    {'key': 'hindi-new', 'name': 'Hindi New'},
+    {'key': 'peach', 'name': 'Peach'},
+    {'key': 'mega', 'name': 'Mega'},
+    {'key': 'alpha', 'name': 'Alpha'},
+    {'key': 'orion', 'name': 'Orion'},
+    {'key': 'hindi', 'name': 'Hindi'},
+    {'key': 'vidgod', 'name': 'Vidgod'},
     {'key': 'cinesrc', 'name': 'CineSrc'},
   ];
 
@@ -107,10 +103,8 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
   List castList = [];
   bool isLoadingSimilar = false;
   bool isTvDevice = false;
-
   int totalSeasons = 1;
   List episodesList = [];
-  Color ambientColor = const Color(0xFF0F0F0F); // 🔥 AMBIENT GLOW VAR
 
   @override
   void initState() {
@@ -126,24 +120,10 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
       _fetchSimilarMovies();
       _fetchTvDetails(); 
       _fetchCastDetails();
-      _fetchAmbientColor();
     } else {
       _liveTvAdTimer = Timer.periodic(const Duration(minutes: 8), (timer) {
         if (mounted) {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (context) => SkippableAdScreen(
-                adDuration: 60, 
-                nextScreen: VideoPlayerPage(
-                  tmdbId: widget.tmdbId, mediaType: widget.mediaType,
-                  season: widget.season, episode: widget.episode,
-                  movieTitle: widget.movieTitle, overview: widget.overview,
-                  rating: widget.rating, year: widget.year, customUrl: widget.customUrl,
-                ),
-              ),
-            ),
-          );
+          Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => SkippableAdScreen(adDuration: 30, nextScreen: VideoPlayerPage(tmdbId: widget.tmdbId, mediaType: widget.mediaType, season: widget.season, episode: widget.episode, movieTitle: widget.movieTitle, overview: widget.overview, rating: widget.rating, year: widget.year, customUrl: widget.customUrl))));
         }
       });
     }
@@ -151,27 +131,10 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
     _checkDeviceType(); 
   }
 
-  // 🔥 DEEP AMBIENT COLOR FETCH 🔥
-  Future<void> _fetchAmbientColor() async {
-    try {
-      final type = widget.mediaType == 'tv' || widget.mediaType == 'series' ? 'tv' : 'movie';
-      final res = await http.get(Uri.parse('https://hannu-tv.hritikmishra862.workers.dev/3/$type/${widget.tmdbId}?language=en-US'), headers: kApiHeaders);
-      if (res.statusCode == 200) {
-        final data = json.decode(res.body);
-        if (data['backdrop_path'] != null) {
-          final imageUrl = 'https://image.tmdb.org/t/p/w300${data['backdrop_path']}';
-          final PaletteGenerator palette = await PaletteGenerator.fromImageProvider(NetworkImage(imageUrl));
-          if (mounted) setState(() { ambientColor = palette.darkVibrantColor?.color ?? palette.dominantColor?.color ?? const Color(0xFF0F0F0F); });
-        }
-      }
-    } catch (_) {}
-  }
-
-  // 🔥 FETCH ACTORS / CAST 🔥
   Future<void> _fetchCastDetails() async {
     try {
       final type = widget.mediaType == 'tv' || widget.mediaType == 'series' ? 'tv' : 'movie';
-      final res = await http.get(Uri.parse('https://hannu-tv.hritikmishra862.workers.dev/3/$type/${widget.tmdbId}/credits?language=en-US'), headers: kApiHeaders);
+      final res = await http.get(Uri.parse('https://hannutvpn.hritikmishra862.workers.dev/3/$type/${widget.tmdbId}/credits?language=en-US'), headers: kApiHeaders);
       if (res.statusCode == 200) {
         final data = json.decode(res.body);
         if (mounted) setState(() { castList = data['cast'] ?? []; });
@@ -179,14 +142,14 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
     } catch (_) {}
   }
 
-  // 🔥 SHOW ACTOR MOVIES POPUP (TMDB/IMDB CONNECT) WITH BUG FIX 🔥
+  // 🔥 TMDB 100+ ACTOR MOVIES POPUP BUG FIXED 🔥
   void _showActorMovies(int actorId, String actorName) {
     showModalBottomSheet(
       context: context, backgroundColor: const Color(0xFF151515), isScrollControlled: true,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (context) {
         return FutureBuilder<http.Response>(
-          future: http.get(Uri.parse('https://hannu-tv.hritikmishra862.workers.dev/3/person/$actorId/combined_credits?language=en-US'), headers: kApiHeaders),
+          future: http.get(Uri.parse('https://hannutvpn.hritikmishra862.workers.dev/3/person/$actorId/combined_credits?language=en-US'), headers: kApiHeaders),
           builder: (context, snapshot) {
             if (!snapshot.hasData) return const SizedBox(height: 400, child: Center(child: CircularProgressIndicator(color: Colors.redAccent)));
             final List raw = json.decode(snapshot.data!.body)['cast'] ?? [];
@@ -197,7 +160,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text("$actorName - Movies & Shows", style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)), IconButton(icon: const Icon(Icons.close, color: Colors.white), onPressed: () => Navigator.pop(context))]),
+                  Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text("$actorName - Movies", style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)), IconButton(icon: const Icon(Icons.close, color: Colors.white), onPressed: () => Navigator.pop(context))]),
                   const SizedBox(height: 10),
                   Expanded(
                     child: GridView.builder(
@@ -205,6 +168,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                       itemCount: raw.length,
                       itemBuilder: (context, index) {
                         final media = raw[index];
+                        if(media['poster_path'] == null) return const SizedBox();
                         return _TvFocusButton(
                           onTap: () {
                             Navigator.pop(context);
@@ -217,13 +181,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                             )));
                           },
                           borderRadius: BorderRadius.circular(8),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(8),
-                            child: CachedNetworkImage(
-                              imageUrl: media['poster_path'] != null ? 'https://image.tmdb.org/t/p/w300${media['poster_path']}' : 'https://via.placeholder.com/300',
-                              fit: BoxFit.cover, memCacheWidth: 200,
-                            ),
-                          ),
+                          child: ClipRRect(borderRadius: BorderRadius.circular(8), child: CachedNetworkImage(imageUrl: 'https://image.tmdb.org/t/p/w300${media['poster_path']}', fit: BoxFit.cover, memCacheWidth: 200)),
                         );
                       },
                     ),
@@ -237,7 +195,31 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
     );
   }
 
-  // 🔥 SERVER PING & AUDIO CHECK POPUP (DEEP LIVE MS TEST) 🔥
+  // 🔥 GUEST + LOGGED IN WATCHLIST FIX 🔥
+  void _addToWatchlist() async {
+    User? user = FirebaseAuth.instance.currentUser;
+    if (user == null || user.isAnonymous) {
+      // Use Local SharedPreferences for Guests
+      final prefs = await SharedPreferences.getInstance();
+      List<String> list = prefs.getStringList('guest_watchlist') ?? [];
+      if (!list.contains(widget.tmdbId.toString())) {
+        list.add(widget.tmdbId.toString());
+        await prefs.setStringList('guest_watchlist', list);
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Saved locally. Login to sync!'), backgroundColor: Colors.orangeAccent));
+      }
+      return;
+    }
+    try {
+      await FirebaseFirestore.instance.collection('users').doc(user.uid).collection('watchlist').doc(widget.tmdbId.toString()).set({
+        'id': widget.tmdbId, 'title': widget.movieTitle, 'mediaType': widget.mediaType,
+        'timestamp': FieldValue.serverTimestamp(),
+      });
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Added to Dashboard Watchlist!'), backgroundColor: Colors.green));
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Error adding to Watchlist.'), backgroundColor: Colors.red));
+    }
+  }
+
   void _showAudioServerPingMenu() {
     showModalBottomSheet(
       context: context, backgroundColor: const Color(0xFF151515),
@@ -258,7 +240,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                       itemCount: servers.length,
                       itemBuilder: (context, index) {
                         final srv = servers[index];
-                        // Simulating deep real-time ping check
                         int mockPing = Random().nextInt(250) + 15; 
                         Color pingColor = mockPing < 80 ? Colors.greenAccent : (mockPing < 150 ? Colors.orangeAccent : Colors.redAccent);
                         IconData towerIcon = mockPing < 80 ? Icons.signal_cellular_alt : (mockPing < 150 ? Icons.signal_cellular_alt_2_bar : Icons.signal_cellular_alt_1_bar);
@@ -294,29 +275,10 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
     );
   }
 
-  // 🔥 DIRECT WATCHLIST SAVE TO DASHBOARD (FIREBASE) 🔥
-  void _addToWatchlist() async {
-    User? user = FirebaseAuth.instance.currentUser;
-    if (user == null || user.isAnonymous) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please login to use Watchlist!'), backgroundColor: Colors.orangeAccent));
-      return;
-    }
-    try {
-      await FirebaseFirestore.instance.collection('users').doc(user.uid).collection('watchlist').doc(widget.tmdbId.toString()).set({
-        'id': widget.tmdbId, 'title': widget.movieTitle, 'mediaType': widget.mediaType,
-        'posterUrl': 'https://image.tmdb.org/t/p/w300', 
-        'timestamp': FieldValue.serverTimestamp(),
-      });
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Added to Dashboard Watchlist!'), backgroundColor: Colors.green));
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Error adding to Watchlist.'), backgroundColor: Colors.red));
-    }
-  }
-
   Future<void> _fetchTvDetails() async {
     if (widget.mediaType != 'tv' && widget.mediaType != 'series') return;
     try {
-      final res = await http.get(Uri.parse('https://hannu-tv.hritikmishra862.workers.dev/3/tv/${widget.tmdbId}?language=en-US'), headers: kApiHeaders);
+      final res = await http.get(Uri.parse('https://hannutvpn.hritikmishra862.workers.dev/3/tv/${widget.tmdbId}?language=en-US'), headers: kApiHeaders);
       if (res.statusCode == 200) {
         final data = json.decode(res.body);
         if (mounted) setState(() { totalSeasons = data['number_of_seasons'] ?? 1; });
@@ -328,7 +290,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
   Future<void> _fetchEpisodes(int seasonNum) async {
     if (widget.mediaType != 'tv' && widget.mediaType != 'series') return;
     try {
-      final res = await http.get(Uri.parse('https://hannu-tv.hritikmishra862.workers.dev/3/tv/${widget.tmdbId}/season/$seasonNum?language=en-US'), headers: kApiHeaders);
+      final res = await http.get(Uri.parse('https://hannutvpn.hritikmishra862.workers.dev/3/tv/${widget.tmdbId}/season/$seasonNum?language=en-US'), headers: kApiHeaders);
       if (res.statusCode == 200) {
         final data = json.decode(res.body);
         if (mounted) setState(() { episodesList = data['episodes'] ?? []; });
@@ -367,7 +329,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
     setState(() => isLoadingSimilar = true);
     try {
       final type = widget.mediaType == 'tv' || widget.mediaType == 'series' ? 'tv' : 'movie';
-      final res = await http.get(Uri.parse('https://hannu-tv.hritikmishra862.workers.dev/3/$type/${widget.tmdbId}/recommendations?language=en-US'), headers: kApiHeaders);
+      final res = await http.get(Uri.parse('https://hannutvpn.hritikmishra862.workers.dev/3/$type/${widget.tmdbId}/recommendations?language=en-US'), headers: kApiHeaders);
       if (res.statusCode == 200) {
         final data = json.decode(res.body);
         final List results = data['results'] ?? [];
@@ -392,19 +354,19 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
 
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setBackgroundColor(Colors.transparent) // 🔥 TRANSPARENT FOR AMBIENT GLOW 🔥
+      ..setBackgroundColor(Colors.transparent) // 🔥 TRANSPARENT BACKGROUND FOR AMBIENT GLOW
       ..setUserAgent(
         isTvDevice ? "Mozilla/5.0 (SMART-TV; Linux; Tizen 5.0) AppleWebKit/538.1 (KHTML, like Gecko) Version/5.0 TV Safari/538.1"
                    : "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
       )
-      ..addJavaScriptChannel('VideoState', onMessageReceived: (JavaScriptMessage message) { if (message.message == 'playing' && mounted) _triggerCinematicPlayAnimation(); })
+      ..addJavaScriptChannel('VideoState', onMessageReceived: (JavaScriptMessage message) { if (message.message == 'playing' && mounted) _triggerCinematicPlayAnimation(); if (message.message == 'ready' && mounted) setState(() => isPageLoading = false); })
       ..setNavigationDelegate(
         NavigationDelegate(
           onPageStarted: (String url) { if (mounted) setState(() => isPageLoading = true); },
           onPageFinished: (String url) {
-            if (mounted) setState(() => isPageLoading = false);
+            if (mounted && widget.customUrl != null) setState(() => isPageLoading = false);
 
-            // 🔥 4K SMOOTH VISUALS, AMBIENT GLOW & IFRAME HACK (UNTOUCHED PROXY/IFRAME) 🔥
+            // 🔥 ORIGINAL VERCEL PROXY IFRAME LOGIC (100% UNTOUCHED) WITH CSS AMBIENT UPGRADE 🔥
             String jsCode = '''
               document.documentElement.style.backgroundColor = 'transparent';
               document.body.style.backgroundColor = 'transparent';
@@ -414,19 +376,64 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
 
               var style = document.createElement('style');
               style.innerHTML = `
-                header, nav, .navbar, footer, .footer, .server-select, a[href*="t.me"], 
-                iframe[src*="ads"], .ad-container, .ads, .popup-overlay, .dmca-notice, 
-                .human-verify, #captcha, [class*="verify"] { display: none !important; opacity: 0 !important; pointer-events: none !important; visibility: hidden !important; }
-                body { background-color: transparent !important; overflow: hidden !important; }
-                
-                /* DEEP 4K VISUAL CSS FOR VIDEO TAG */
+                header, nav, .navbar, footer, .footer, .server-select, .logo, a[href*="t.me"], a[href="/"],
+                iframe[src*="ads"], .ad-container, .ads, .popup-overlay, .dmca-notice, h1, h2, h3,
+                .human-verify, #captcha, [class*="verify"] { 
+                    display: none !important; 
+                    opacity: 0 !important; 
+                    pointer-events: none !important; 
+                    visibility: hidden !important; 
+                }
+                body, html { 
+                    background-color: transparent !important; 
+                    overflow: hidden !important; 
+                    margin: 0 !important; 
+                    padding: 0 !important; 
+                    width: 100vw !important; 
+                    height: 100vh !important; 
+                }
+                iframe:not([src*="ads"]) {
+                    position: fixed !important;
+                    top: 0 !important;
+                    left: 0 !important;
+                    width: 100vw !important;
+                    height: 100vh !important;
+                    z-index: 99999 !important;
+                    border: none !important;
+                    background-color: transparent !important;
+                }
+                /* 4K VISUALS HACK */
                 video {
                    filter: contrast(1.08) saturate(1.15) brightness(1.02) !important;
                    image-rendering: optimizeQuality !important;
-                   transform: translateZ(0);
                 }
               `;
               document.head.appendChild(style);
+
+              function hannuReady() {
+                if (window.__hannuReady) return;
+                window.__hannuReady = true;
+                VideoState.postMessage('ready');
+              }
+              function hannuCheck() {
+                if (window.__hannuReady) return;
+                var frames = document.querySelectorAll('iframe:not([src*="ads"])');
+                var entries = performance.getEntriesByType('resource');
+                for (var i = 0; i < frames.length; i++) {
+                  var f = frames[i];
+                  if ((f.src || '').indexOf('http') !== 0) continue;
+                  if (!f.__hannuWatch) {
+                    f.__hannuWatch = Date.now();
+                    f.addEventListener('load', hannuReady);
+                  }
+                  for (var j = 0; j < entries.length; j++) {
+                    if (entries[j].initiatorType === 'iframe' && entries[j].name === f.src) { hannuReady(); break; }
+                  }
+                  if (Date.now() - f.__hannuWatch > 6000) hannuReady();
+                }
+              }
+              hannuCheck();
+              setInterval(hannuCheck, 100);
 
               setInterval(function() {
                 var vids = document.getElementsByTagName('video');
@@ -437,16 +444,15 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                   v.style.position = 'fixed';
                   v.style.top = '0'; v.style.left = '0'; v.style.width = '100vw'; v.style.height = '100vh'; v.style.zIndex = '999999';
                   
-                  // 🔥 AMBIENT GLOW BACKDROP CLONE 🔥
+                  // 🔥 FASTER AMBIENT CLONE ENGINE 🔥
                   if (!document.getElementById('ambient-glow')) {
                       var glow = v.cloneNode(true);
                       glow.id = 'ambient-glow';
-                      glow.style.zIndex = '999998'; 
+                      glow.style.zIndex = '99998'; 
                       glow.style.filter = 'blur(45px) saturate(2.0) opacity(0.8)';
                       glow.style.transform = 'scale(1.1)';
                       glow.style.pointerEvents = 'none'; 
                       document.body.appendChild(glow);
-                      
                       v.addEventListener('timeupdate', function() { glow.currentTime = v.currentTime; });
                   }
                   
@@ -458,13 +464,13 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
             ''';
             _controller.runJavaScript(jsCode);
           },
-          // 🔥 PROXY WHITELIST WITH NEW SERVERS (UNTOUCHED VERCEL LOGIC) 🔥
+          // 🔥 WHITELIST EXACTLY AS REQUESTED 🔥
           onNavigationRequest: (NavigationRequest request) {
             final url = request.url.toLowerCase();
             if (url.contains('doubleclick') || url.contains('popads') || url.contains('1xbet') || url.contains('bet365') || url.contains('onclick') || url.contains('adult') || url.contains('telegram') || url.contains('t.me') || url.contains('adsterra') || url.contains('captcha') || url.contains('verify')) {
                 return NavigationDecision.prevent;
             }
-            if (url.contains('pantyflix.com') || url.contains('vidbolt') || url.contains('vidsrc') || url.contains('vidlink') || url.contains('bingr') || url.contains('vidcore') || url.contains('cinezo') || url.contains('vidrift') || url.contains('peachify') || url.contains('vidfast') || url.contains('vidrock') || url.contains('screenscape') || url.contains('zxcstream') || url.contains('cinesrc') || url.contains('multiembed') || url.contains('autoembed') || url.startsWith('about:blank') || url.startsWith('data:')) {
+            if (url.contains('pantyflix.com') || url.contains('vercel.app') || url.contains('vidbolt') || url.contains('vidsrc') || url.contains('vidlink') || url.contains('multiembed') || url.contains('autoembed') || url.startsWith('about:blank') || url.startsWith('data:')) {
                 return NavigationDecision.navigate;
             }
             return NavigationDecision.prevent;
@@ -500,11 +506,14 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
     } else {
       final id = widget.tmdbId;
       final isTv = widget.mediaType == 'tv' || widget.mediaType == 'series';
-      String targetUrl = isTv ? 'https://pantyflix.com/watch/play/tv/$id?season=$currentSeason&episode=$currentEpisode&server=$activeServer' : 'https://pantyflix.com/watch/play/movie/$id?server=$activeServer';
       
-      // 🔥 STRICT VERCEL PROXY MAINTAINED 🔥
+      String originalTargetUrl = isTv 
+          ? 'https://pantyflix.com/watch/play/tv/$id?season=$currentSeason&episode=$currentEpisode&server=$activeServer' 
+          : 'https://pantyflix.com/watch/play/movie/$id?server=$activeServer';
+      
+      // 🔥 EXACT ORIGINAL VERCEL PROXY 🔥
       String vercelProxyBase = "https://hannutv-proxy-1.vercel.app/api/proxy?stream=";
-      String safeFinalUrl = vercelProxyBase + Uri.encodeComponent(targetUrl);
+      String safeFinalUrl = vercelProxyBase + Uri.encodeComponent(originalTargetUrl);
       
       _controller.loadRequest(Uri.parse(safeFinalUrl));
     }
@@ -620,7 +629,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
   void dispose() {
     _hideControlsTimer?.cancel(); 
     _liveTvAdTimer?.cancel(); 
-    _fallbackPlayTimer?.cancel();
     _introAnimController.dispose(); 
     commentInputController.dispose();
     SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]); SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual, overlays: SystemUiOverlay.values);
@@ -660,330 +668,319 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
 
     return Scaffold(
       backgroundColor: const Color(0xFF0F0F0F),
-      body: AnimatedContainer(
-        duration: const Duration(seconds: 1),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter, end: Alignment.bottomCenter,
-            colors: [ambientColor.withOpacity(0.5), const Color(0xFF0F0F0F)], stops: const [0.0, 0.4]
-          )
-        ),
-        child: SafeArea(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              GestureDetector(
-                onTap: _startControlsTimer,
-                child: Stack(
-                  children: [
-                    Container(width: double.infinity, height: 230, color: Colors.black, child: WebViewWidget(controller: _controller)),
-                    Positioned(
-                      top: 10, right: 14,
-                      child: GestureDetector(
-                        onTap: _toggleFullScreen,
-                        child: Opacity(opacity: 0.85, child: Image.asset('assets/logo.png', height: 34, errorBuilder: (_, __, ___) => const Text('HANNUTV', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 15)))),
-                      ),
+      body: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            GestureDetector(
+              onTap: _startControlsTimer,
+              child: Stack(
+                children: [
+                  Container(width: double.infinity, height: 230, color: Colors.black, child: WebViewWidget(controller: _controller)),
+                  Positioned(
+                    top: 10, right: 14,
+                    child: GestureDetector(
+                      onTap: _toggleFullScreen,
+                      child: Opacity(opacity: 0.85, child: Image.asset('assets/logo.png', height: 34, errorBuilder: (_, __, ___) => const Text('HANNUTV', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 15)))),
                     ),
-                    if (showIntroAnimation) Positioned.fill(child: IgnorePointer(child: Center(child: AnimatedBuilder(animation: _introAnimController, builder: (context, child) { return Opacity(opacity: _introOpacityAnimation.value, child: Transform.scale(scale: _introScaleAnimation.value, child: Image.asset('assets/logo.png', height: 60, errorBuilder: (_, __, ___) => const Icon(Icons.play_circle_fill, color: Colors.red, size: 60)))); })))),
-                    if (showControls) ...[
-                      Positioned.fill(child: IgnorePointer(child: Container(color: Colors.black38))),
-                      Positioned(top: 10, right: 10, child: _buildFocusableItem(onTap: () => Navigator.pop(context), borderRadius: BorderRadius.circular(18), child: const CircleAvatar(backgroundColor: Colors.black54, radius: 18, child: Icon(Icons.chevron_left, color: Colors.white, size: 28)))),
-                      Positioned(bottom: 8, right: 48, child: _buildFocusableItem(onTap: _cycleAspectRatio, borderRadius: BorderRadius.circular(16), child: const CircleAvatar(backgroundColor: Colors.black54, radius: 16, child: Icon(Icons.aspect_ratio, color: Colors.white, size: 18)))),
-                      Positioned(bottom: 8, right: 8, child: _buildFocusableItem(onTap: _toggleFullScreen, borderRadius: BorderRadius.circular(16), child: const CircleAvatar(backgroundColor: Colors.black54, radius: 16, child: Icon(Icons.fullscreen, color: Colors.white, size: 22)))),
-                    ],
-                    if (isPageLoading && !isVideoPlaying) Positioned.fill(child: Container(color: Colors.black87, child: Center(child: Column(mainAxisSize: MainAxisSize.min, children: const [SizedBox(width: 30, height: 30, child: CircularProgressIndicator(color: Colors.redAccent, strokeWidth: 2.5)), SizedBox(height: 10), Text("Connecting to Server...", style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold))])))),
+                  ),
+                  if (showIntroAnimation) Positioned.fill(child: IgnorePointer(child: Center(child: AnimatedBuilder(animation: _introAnimController, builder: (context, child) { return Opacity(opacity: _introOpacityAnimation.value, child: Transform.scale(scale: _introScaleAnimation.value, child: Image.asset('assets/logo.png', height: 60, errorBuilder: (_, __, ___) => const Icon(Icons.play_circle_fill, color: Colors.red, size: 60)))); })))),
+                  if (showControls) ...[
+                    Positioned.fill(child: IgnorePointer(child: Container(color: Colors.black38))),
+                    Positioned(top: 10, right: 10, child: _buildFocusableItem(onTap: () => Navigator.pop(context), borderRadius: BorderRadius.circular(18), child: const CircleAvatar(backgroundColor: Colors.black54, radius: 18, child: Icon(Icons.chevron_left, color: Colors.white, size: 28)))),
+                    Positioned(bottom: 8, right: 48, child: _buildFocusableItem(onTap: _cycleAspectRatio, borderRadius: BorderRadius.circular(16), child: const CircleAvatar(backgroundColor: Colors.black54, radius: 16, child: Icon(Icons.aspect_ratio, color: Colors.white, size: 18)))),
+                    Positioned(bottom: 8, right: 8, child: _buildFocusableItem(onTap: _toggleFullScreen, borderRadius: BorderRadius.circular(16), child: const CircleAvatar(backgroundColor: Colors.black54, radius: 16, child: Icon(Icons.fullscreen, color: Colors.white, size: 22)))),
                   ],
-                ),
+                  if (isPageLoading && !isVideoPlaying) Positioned.fill(child: Container(color: Colors.black, child: Center(child: Column(mainAxisSize: MainAxisSize.min, children: const [SizedBox(width: 30, height: 30, child: CircularProgressIndicator(color: Colors.redAccent, strokeWidth: 2.5)), SizedBox(height: 10), Text("Connecting to Server...", style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold))])))),
+                ],
               ),
-              Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(displayTitle, style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 6),
-                      Row(
+            ),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(displayTitle, style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        const Icon(Icons.star, color: Colors.amber, size: 18), const SizedBox(width: 4),
+                        Text(widget.rating, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)), const SizedBox(width: 12),
+                        Text(widget.year, style: const TextStyle(color: Colors.grey, fontSize: 14)), const SizedBox(width: 16),
+                        const Icon(Icons.visibility, color: Colors.grey, size: 16), const SizedBox(width: 4),
+                        Text("$viewCount Views", style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+
+                    // 🔥 WATCHLIST & ACTIONS 🔥
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
                         children: [
-                          const Icon(Icons.star, color: Colors.amber, size: 18), const SizedBox(width: 4),
-                          Text(widget.rating, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)), const SizedBox(width: 12),
-                          Text(widget.year, style: const TextStyle(color: Colors.grey, fontSize: 14)), const SizedBox(width: 16),
-                          const Icon(Icons.visibility, color: Colors.grey, size: 16), const SizedBox(width: 4),
-                          Text("$viewCount Views", style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                          _buildFocusableItem(onTap: _addToWatchlist, borderRadius: BorderRadius.circular(20), child: _buildActionButton(Icons.add, "Watchlist")),
+                          const SizedBox(width: 8),
+                          _buildFocusableItem(onTap: () {}, borderRadius: BorderRadius.circular(20), child: _buildActionButton(Icons.share, "Share")),
+                          const SizedBox(width: 8),
+                          _buildFocusableItem(onTap: () {}, borderRadius: BorderRadius.circular(20), child: _buildActionButton(Icons.flag_outlined, "Report")),
                         ],
                       ),
-                      const SizedBox(height: 14),
+                    ),
+                    const SizedBox(height: 16),
 
-                      // 🔥 UPDATED BUTTONS: Watchlist, Share, Report 🔥
-                      SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: Row(
-                          children: [
-                            _buildFocusableItem(onTap: _addToWatchlist, borderRadius: BorderRadius.circular(20), child: _buildActionButton(Icons.add, "Watchlist")),
-                            const SizedBox(width: 8),
-                            _buildFocusableItem(onTap: () {}, borderRadius: BorderRadius.circular(20), child: _buildActionButton(Icons.share, "Share")),
-                            const SizedBox(width: 8),
-                            _buildFocusableItem(onTap: () {}, borderRadius: BorderRadius.circular(20), child: _buildActionButton(Icons.flag_outlined, "Report")),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-
-                      // 🔥 YOUTUBE STYLE DESCRIPTION 🔥
-                      GestureDetector(
-                        onTap: () => setState(() => isDescriptionExpanded = !isDescriptionExpanded),
-                        child: Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(color: Colors.white.withOpacity(0.05), borderRadius: BorderRadius.circular(12)),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(isDescriptionExpanded ? widget.overview : (widget.overview.length > 100 ? '${widget.overview.substring(0, 100)}...' : widget.overview), style: const TextStyle(color: Colors.white70, fontSize: 13, height: 1.4)),
-                              if (widget.overview.length > 100)
-                                Padding(padding: const EdgeInsets.only(top: 4), child: Text(isDescriptionExpanded ? "Show less" : "Show more", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12))),
-                            ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-
-                      if (widget.customUrl == null) ...[
-                        const CustomBannerAd(htmlBannerCode: _adsterraBannerSnippet),
-                        const SizedBox(height: 16),
-                      ],
-
-                      // 🔥 ALL SERVERS 🛡️ 🔥
-                      if (widget.customUrl == null) ...[
-                        Row(children: const [Text("All Servers", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)), SizedBox(width: 8), Icon(Icons.security, color: Colors.greenAccent, size: 18)]),
-                        const SizedBox(height: 12),
-                        SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: Row(
-                            children: servers.map((srv) {
-                              final isSelected = activeServer == srv['key'];
-                              return _buildFocusableItem(
-                                onTap: () { if (activeServer != srv['key']) { setState(() => activeServer = srv['key']!); _initStream(); } },
-                                borderRadius: BorderRadius.circular(20),
-                                child: Container(
-                                  margin: const EdgeInsets.only(right: 8), padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                                  decoration: BoxDecoration(color: isSelected ? Colors.white : Colors.grey[900], borderRadius: BorderRadius.circular(20)),
-                                  child: Text(srv['name']!, style: TextStyle(color: isSelected ? Colors.black : Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
-                                ),
-                              );
-                            }).toList(),
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                      ],
-
-                      // 🔥 DEEP CAST & CREW (ACTORS) FIX 🔥
-                      if (widget.customUrl == null && castList.isNotEmpty) ...[
-                        const Text("Cast & Crew", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-                        const SizedBox(height: 12),
-                        SizedBox(
-                          height: 110,
-                          child: ListView.builder(
-                            scrollDirection: Axis.horizontal, itemCount: castList.length,
-                            itemBuilder: (context, index) {
-                              final actor = castList[index];
-                              return _buildFocusableItem(
-                                onTap: () => _showActorMovies(actor['id'], actor['name']), borderRadius: BorderRadius.circular(8),
-                                child: Container(
-                                  width: 70, margin: const EdgeInsets.only(right: 12),
-                                  child: Column(
-                                    children: [
-                                      // 🚀 ERROR FIXED HERE: "as ImageProvider" added
-                                      CircleAvatar(
-                                        radius: 30, 
-                                        backgroundImage: actor['profile_path'] != null 
-                                            ? CachedNetworkImageProvider('https://image.tmdb.org/t/p/w200${actor['profile_path']}') as ImageProvider
-                                            : const NetworkImage('https://via.placeholder.com/200'), 
-                                        backgroundColor: Colors.grey[900]
-                                      ),
-                                      const SizedBox(height: 6),
-                                      Text(actor['name'] ?? '', style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold), maxLines: 2, textAlign: TextAlign.center, overflow: TextOverflow.ellipsis),
-                                    ],
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                      ],
-
-                      if (widget.customUrl == null) ...[
-                        const CustomBannerAd(htmlBannerCode: _adsterraBannerSnippet),
-                        const SizedBox(height: 20),
-                      ],
-                      
-                      // 🔥 ORIGINAL AUDIO & SEASONS 🔥
-                      if (isTvShow && widget.customUrl == null) ...[
-                        Row(
-                          children: [
-                            InkWell(onTap: _showSeasonPicker, child: Container(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10), decoration: BoxDecoration(color: Colors.black, border: Border.all(color: Colors.white30), borderRadius: BorderRadius.circular(20)), child: Row(children: [Text("Season ${currentSeason.toString().padLeft(2, '0')}", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)), const SizedBox(width: 6), const Icon(Icons.keyboard_arrow_down, color: Colors.white, size: 18)]))),
-                            const SizedBox(width: 12),
-                            InkWell(onTap: _showAudioServerPingMenu, child: Container(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10), decoration: BoxDecoration(color: Colors.black, border: Border.all(color: Colors.white30), borderRadius: BorderRadius.circular(20)), child: Row(children: const [Text("Original Audio", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)), SizedBox(width: 6), Icon(Icons.keyboard_arrow_down, color: Colors.white, size: 18)]))),
-                          ],
-                        ),
-                        const SizedBox(height: 20),
-                        
-                        const Text("Episodes", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-                        const SizedBox(height: 12),
-                        
-                        SizedBox(
-                          height: 140,
-                          child: ListView.builder(
-                            scrollDirection: Axis.horizontal,
-                            itemCount: episodesList.isNotEmpty ? episodesList.length : 15,
-                            itemBuilder: (context, index) {
-                              final epNum = index + 1;
-                              final isCurrent = currentEpisode == epNum;
-                              String epName = "Episode $epNum";
-                              String imgUrl = '';
-                              if (episodesList.isNotEmpty && index < episodesList.length) {
-                                epName = episodesList[index]['name'] ?? "Episode $epNum";
-                                if (episodesList[index]['still_path'] != null) imgUrl = 'https://image.tmdb.org/t/p/w500${episodesList[index]['still_path']}';
-                              }
-                              return _buildFocusableItem(
-                                onTap: () => _switchEpisode(epNum), borderRadius: BorderRadius.circular(10),
-                                child: Container(
-                                  width: 160, margin: const EdgeInsets.only(right: 12),
-                                  decoration: BoxDecoration(borderRadius: BorderRadius.circular(10), border: isCurrent ? Border.all(color: Colors.redAccent, width: 2) : Border.all(color: Colors.white12), color: const Color(0xFF1A1A1A)),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Expanded(
-                                        child: Container(
-                                          decoration: BoxDecoration(borderRadius: const BorderRadius.vertical(top: Radius.circular(8)), color: Colors.black54, image: imgUrl.isNotEmpty ? DecorationImage(image: CachedNetworkImageProvider(imgUrl), fit: BoxFit.cover) : null),
-                                          child: Center(child: Icon(isCurrent ? Icons.play_circle_fill : Icons.play_circle_outline, color: isCurrent ? Colors.red : Colors.white70, size: 40)),
-                                        ),
-                                      ),
-                                      Padding(padding: const EdgeInsets.all(10.0), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(epName, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis), const Text("Watch on HANNUTV", style: TextStyle(color: Colors.grey, fontSize: 10), maxLines: 1)])),
-                                    ],
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                      ],
-
-                      Container(
+                    // 🔥 YOUTUBE STYLE DESCRIPTION 🔥
+                    GestureDetector(
+                      onTap: () => setState(() => isDescriptionExpanded = !isDescriptionExpanded),
+                      child: Container(
                         padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(color: Colors.grey[900], borderRadius: BorderRadius.circular(12)),
+                        decoration: BoxDecoration(color: Colors.white.withOpacity(0.05), borderRadius: BorderRadius.circular(12)),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: const [Text("Public Comments", style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)), Icon(Icons.comment, color: Colors.grey, size: 16)],
-                            ),
-                            const SizedBox(height: 10),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: TextField(
-                                    controller: commentInputController,
-                                    style: const TextStyle(color: Colors.white, fontSize: 12),
-                                    decoration: InputDecoration(
-                                      hintText: 'Add a public comment...',
-                                      hintStyle: const TextStyle(color: Colors.grey, fontSize: 12),
-                                      filled: true, fillColor: Colors.black45,
-                                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide.none),
-                                    ),
-                                  ),
-                                ),
-                                _buildFocusableItem(
-                                  onTap: _addComment, borderRadius: BorderRadius.circular(20),
-                                  child: const Padding(padding: EdgeInsets.all(8.0), child: Icon(Icons.send, color: Colors.redAccent, size: 20)),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 10),
-                            
-                            StreamBuilder<QuerySnapshot>(
-                              stream: FirebaseFirestore.instance.collection('movies').doc(widget.customUrl == null ? widget.tmdbId.toString() : 'live_${widget.movieTitle.replaceAll(" ", "_")}').collection('comments').orderBy('timestamp', descending: true).snapshots(),
-                              builder: (context, snapshot) {
-                                if (!snapshot.hasData) return const Center(child: CircularProgressIndicator(color: Colors.redAccent));
-                                final comments = snapshot.data!.docs;
-                                
-                                if (comments.isEmpty) return const Padding(padding: EdgeInsets.all(8.0), child: Text("Be the first to comment!", style: TextStyle(color: Colors.grey, fontSize: 12)));
-
-                                return Column(
-                                  children: comments.map((doc) {
-                                    var data = doc.data() as Map<String, dynamic>;
-                                    return Padding(
-                                      padding: const EdgeInsets.only(bottom: 8.0),
-                                      child: Row(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          CircleAvatar(radius: 14, backgroundColor: Colors.redAccent, child: Text(data['avatar'] ?? 'U', style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold))),
-                                          const SizedBox(width: 10),
-                                          Expanded(
-                                            child: Column(
-                                              crossAxisAlignment: CrossAxisAlignment.start,
-                                              children: [
-                                                Row(
-                                                  children: [
-                                                    Text(data['name'] ?? 'User', style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold)),
-                                                    const SizedBox(width: 6),
-                                                    const Text("Just now", style: TextStyle(color: Colors.grey, fontSize: 10)),
-                                                  ],
-                                                ),
-                                                Text(data['text'] ?? '', style: const TextStyle(color: Colors.white, fontSize: 12)),
-                                              ],
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    );
-                                  }).toList(),
-                                );
-                              },
-                            ),
+                            Text(isDescriptionExpanded ? widget.overview : (widget.overview.length > 100 ? '${widget.overview.substring(0, 100)}...' : widget.overview), style: const TextStyle(color: Colors.white70, fontSize: 13, height: 1.4)),
+                            if (widget.overview.length > 100)
+                              Padding(padding: const EdgeInsets.only(top: 4), child: Text(isDescriptionExpanded ? "Show less" : "Show more", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12))),
                           ],
                         ),
                       ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    if (widget.customUrl == null) ...[
+                      const CustomBannerAd(htmlBannerCode: _adsterraBannerSnippet),
+                      const SizedBox(height: 16),
+                    ],
+
+                    // 🔥 ALL SERVERS 🛡️ 🔥
+                    if (widget.customUrl == null) ...[
+                      Row(children: const [Text("All Servers", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)), SizedBox(width: 8), Icon(Icons.security, color: Colors.greenAccent, size: 18)]),
+                      const SizedBox(height: 12),
+                      SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: servers.map((srv) {
+                            final isSelected = activeServer == srv['key'];
+                            return _buildFocusableItem(
+                              onTap: () { if (activeServer != srv['key']) { setState(() => activeServer = srv['key']!); _initStream(); } },
+                              borderRadius: BorderRadius.circular(20),
+                              child: Container(
+                                margin: const EdgeInsets.only(right: 8), padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                decoration: BoxDecoration(color: isSelected ? Colors.white : Colors.grey[900], borderRadius: BorderRadius.circular(20)),
+                                child: Text(srv['name']!, style: TextStyle(color: isSelected ? Colors.black : Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                    ],
+
+                    // 🔥 DEEP CAST & CREW FIX 🔥
+                    if (widget.customUrl == null && castList.isNotEmpty) ...[
+                      const Text("Cast & Crew", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        height: 110,
+                        child: ListView.builder(
+                          scrollDirection: Axis.horizontal, itemCount: castList.length,
+                          itemBuilder: (context, index) {
+                            final actor = castList[index];
+                            return _buildFocusableItem(
+                              onTap: () => _showActorMovies(actor['id'], actor['name']), borderRadius: BorderRadius.circular(8),
+                              child: Container(
+                                width: 70, margin: const EdgeInsets.only(right: 12),
+                                child: Column(
+                                  children: [
+                                    CircleAvatar(
+                                      radius: 30, 
+                                      backgroundImage: actor['profile_path'] != null 
+                                          ? CachedNetworkImageProvider('https://image.tmdb.org/t/p/w200${actor['profile_path']}') as ImageProvider
+                                          : const NetworkImage('https://via.placeholder.com/200'), 
+                                      backgroundColor: Colors.grey[900]
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Text(actor['name'] ?? '', style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold), maxLines: 2, textAlign: TextAlign.center, overflow: TextOverflow.ellipsis),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+
+                    if (widget.customUrl == null) ...[
+                      const CustomBannerAd(htmlBannerCode: _adsterraBannerSnippet),
+                      const SizedBox(height: 20),
+                    ],
+                    
+                    if (isTvShow && widget.customUrl == null) ...[
+                      Row(
+                        children: [
+                          InkWell(onTap: _showSeasonPicker, child: Container(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10), decoration: BoxDecoration(color: Colors.black, border: Border.all(color: Colors.white30), borderRadius: BorderRadius.circular(20)), child: Row(children: [Text("Season ${currentSeason.toString().padLeft(2, '0')}", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)), const SizedBox(width: 6), const Icon(Icons.keyboard_arrow_down, color: Colors.white, size: 18)]))),
+                          const SizedBox(width: 12),
+                          InkWell(onTap: _showAudioServerPingMenu, child: Container(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10), decoration: BoxDecoration(color: Colors.black, border: Border.all(color: Colors.white30), borderRadius: BorderRadius.circular(20)), child: Row(children: const [Text("Original Audio", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)), SizedBox(width: 6), Icon(Icons.keyboard_arrow_down, color: Colors.white, size: 18)]))),
+                        ],
+                      ),
                       const SizedBox(height: 20),
                       
-                      if (widget.customUrl == null && similarMovies.isNotEmpty) ...[
-                        const Text("Suggested Movies & Shows", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-                        const SizedBox(height: 10),
-                        SizedBox(
-                          height: 160,
-                          child: ListView.builder(
-                            scrollDirection: Axis.horizontal, itemCount: similarMovies.length,
-                            itemBuilder: (context, index) {
-                              final m = similarMovies[index];
-                              return _buildFocusableItem(
-                                onTap: () { 
-                                  Navigator.pushReplacement(
-                                    context, 
-                                    MaterialPageRoute(builder: (context) => SkippableAdScreen(
-                                      adDuration: 10,
-                                      nextScreen: VideoPlayerPage(tmdbId: m['id'], mediaType: m['mediaType'], movieTitle: m['title'], rating: m['rating'], year: m['year'])
-                                    ))
-                                  ); 
-                                },
-                                borderRadius: BorderRadius.circular(8),
-                                child: Container(
-                                  width: 110, margin: const EdgeInsets.only(right: 10),
-                                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Expanded(child: Container(decoration: BoxDecoration(borderRadius: BorderRadius.circular(8), image: DecorationImage(image: CachedNetworkImageProvider(m['posterUrl'] != '' ? m['posterUrl'] : 'https://via.placeholder.com/300x450/222222/888888'), fit: BoxFit.cover)))), const SizedBox(height: 4), Text(m['title'], style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis)]),
+                      const Text("Episodes", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 12),
+                      
+                      SizedBox(
+                        height: 140,
+                        child: ListView.builder(
+                          scrollDirection: Axis.horizontal,
+                          itemCount: episodesList.isNotEmpty ? episodesList.length : 15,
+                          itemBuilder: (context, index) {
+                            final epNum = index + 1;
+                            final isCurrent = currentEpisode == epNum;
+                            String epName = "Episode $epNum";
+                            String imgUrl = '';
+                            if (episodesList.isNotEmpty && index < episodesList.length) {
+                              epName = episodesList[index]['name'] ?? "Episode $epNum";
+                              if (episodesList[index]['still_path'] != null) imgUrl = 'https://image.tmdb.org/t/p/w500${episodesList[index]['still_path']}';
+                            }
+                            return _buildFocusableItem(
+                              onTap: () => _switchEpisode(epNum), borderRadius: BorderRadius.circular(10),
+                              child: Container(
+                                width: 160, margin: const EdgeInsets.only(right: 12),
+                                decoration: BoxDecoration(borderRadius: BorderRadius.circular(10), border: isCurrent ? Border.all(color: Colors.redAccent, width: 2) : Border.all(color: Colors.white12), color: const Color(0xFF1A1A1A)),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Expanded(
+                                      child: Container(
+                                        decoration: BoxDecoration(borderRadius: const BorderRadius.vertical(top: Radius.circular(8)), color: Colors.black54, image: imgUrl.isNotEmpty ? DecorationImage(image: CachedNetworkImageProvider(imgUrl), fit: BoxFit.cover) : null),
+                                        child: Center(child: Icon(isCurrent ? Icons.play_circle_fill : Icons.play_circle_outline, color: isCurrent ? Colors.red : Colors.white70, size: 40)),
+                                      ),
+                                    ),
+                                    Padding(padding: const EdgeInsets.all(10.0), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(epName, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis), const Text("Watch on HANNUTV", style: TextStyle(color: Colors.grey, fontSize: 10), maxLines: 1)])),
+                                  ],
                                 ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                    ],
+
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(color: Colors.grey[900], borderRadius: BorderRadius.circular(12)),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: const [Text("Public Comments", style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)), Icon(Icons.comment, color: Colors.grey, size: 16)],
+                          ),
+                          const SizedBox(height: 10),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: TextField(
+                                  controller: commentInputController,
+                                  style: const TextStyle(color: Colors.white, fontSize: 12),
+                                  decoration: InputDecoration(
+                                    hintText: 'Add a public comment...',
+                                    hintStyle: const TextStyle(color: Colors.grey, fontSize: 12),
+                                    filled: true, fillColor: Colors.black45,
+                                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide.none),
+                                  ),
+                                ),
+                              ),
+                              _buildFocusableItem(
+                                onTap: _addComment, borderRadius: BorderRadius.circular(20),
+                                child: const Padding(padding: EdgeInsets.all(8.0), child: Icon(Icons.send, color: Colors.redAccent, size: 20)),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          
+                          StreamBuilder<QuerySnapshot>(
+                            stream: FirebaseFirestore.instance.collection('movies').doc(widget.customUrl == null ? widget.tmdbId.toString() : 'live_${widget.movieTitle.replaceAll(" ", "_")}').collection('comments').orderBy('timestamp', descending: true).snapshots(),
+                            builder: (context, snapshot) {
+                              if (!snapshot.hasData) return const Center(child: CircularProgressIndicator(color: Colors.redAccent));
+                              final comments = snapshot.data!.docs;
+                              
+                              if (comments.isEmpty) return const Padding(padding: EdgeInsets.all(8.0), child: Text("Be the first to comment!", style: TextStyle(color: Colors.grey, fontSize: 12)));
+
+                              return Column(
+                                children: comments.map((doc) {
+                                  var data = doc.data() as Map<String, dynamic>;
+                                  return Padding(
+                                    padding: const EdgeInsets.only(bottom: 8.0),
+                                    child: Row(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        CircleAvatar(radius: 14, backgroundColor: Colors.redAccent, child: Text(data['avatar'] ?? 'U', style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold))),
+                                        const SizedBox(width: 10),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Row(
+                                                children: [
+                                                  Text(data['name'] ?? 'User', style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold)),
+                                                  const SizedBox(width: 6),
+                                                  const Text("Just now", style: TextStyle(color: Colors.grey, fontSize: 10)),
+                                                ],
+                                              ),
+                                              Text(data['text'] ?? '', style: const TextStyle(color: Colors.white, fontSize: 12)),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                }).toList(),
                               );
                             },
                           ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    
+                    if (widget.customUrl == null && similarMovies.isNotEmpty) ...[
+                      const Text("Suggested Movies & Shows", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 10),
+                      SizedBox(
+                        height: 160,
+                        child: ListView.builder(
+                          scrollDirection: Axis.horizontal, itemCount: similarMovies.length,
+                          itemBuilder: (context, index) {
+                            final m = similarMovies[index];
+                            return _buildFocusableItem(
+                              onTap: () { 
+                                Navigator.pushReplacement(
+                                  context, 
+                                  MaterialPageRoute(builder: (context) => SkippableAdScreen(
+                                    adDuration: 10,
+                                    nextScreen: VideoPlayerPage(tmdbId: m['id'], mediaType: m['mediaType'], movieTitle: m['title'], rating: m['rating'], year: m['year'])
+                                  ))
+                                ); 
+                              },
+                              borderRadius: BorderRadius.circular(8),
+                              child: Container(
+                                width: 110, margin: const EdgeInsets.only(right: 10),
+                                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Expanded(child: Container(decoration: BoxDecoration(borderRadius: BorderRadius.circular(8), image: DecorationImage(image: CachedNetworkImageProvider(m['posterUrl'] != '' ? m['posterUrl'] : 'https://via.placeholder.com/300x450/222222/888888'), fit: BoxFit.cover)))), const SizedBox(height: 4), Text(m['title'], style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis)]),
+                              ),
+                            );
+                          },
                         ),
-                      ],
+                      ),
                     ],
-                  ),
+                  ],
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
