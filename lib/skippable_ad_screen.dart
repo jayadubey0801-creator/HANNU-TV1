@@ -12,7 +12,7 @@ class SkippableAdScreen extends StatefulWidget {
   const SkippableAdScreen({
     Key? key, 
     required this.nextScreen,
-    this.adDuration = 10, // 🚀 FIXED TO 10 SECONDS FOR MOVIES (Live TV dynamically overrides this to 30s)
+    this.adDuration = 10, // 🚀 FIXED TO 10 SECONDS FOR MOVIES (Live TV dynamically overrides this)
   }) : super(key: key);
 
   @override
@@ -61,6 +61,7 @@ class _SkippableAdScreenState extends State<SkippableAdScreen> {
             // 🔥 JS INJECTION: CAPTCHA KILLER & JS POPUP KILLER 🔥
             _controller.runJavaScript('''
               window.open = function() { return null; };
+              try { Object.defineProperty(window, 'top', { value: window, writable: false }); } catch(e) {}
               setInterval(function() {
                 var verifiers = document.querySelectorAll('.human-verify, #verify-button, #captcha, [class*="verify"], iframe[src*="recaptcha"], .cf-turnstile');
                 verifiers.forEach(function(btn) { try { btn.click(); } catch(e) {} });

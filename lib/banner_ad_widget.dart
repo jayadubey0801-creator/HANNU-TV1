@@ -21,7 +21,7 @@ class _CustomBannerAdState extends State<CustomBannerAd> {
   Offset? _tapDownPos;
   DateTime? _lastTapTime;
   
-  // Strict 1-second tap validation to block aggressive JS redirects
+  // STRICT 1 SECOND TAP VALIDATION: Blocks delayed malicious JS redirects
   bool get _userTappedRecently =>
       _lastTapTime != null &&
       DateTime.now().difference(_lastTapTime!) < const Duration(seconds: 1);
@@ -38,7 +38,7 @@ class _CustomBannerAdState extends State<CustomBannerAd> {
           onNavigationRequest: (NavigationRequest request) {
             final url = request.url.toLowerCase();
 
-            // 1. Initial banner load aur Adsterra ke scripts ko chalne do taaki ad dikhe
+            // 1. Initial banner load aur Adsterra scripts
             if (url.startsWith('data:') || 
                 url.startsWith('about:blank') || 
                 url.contains('hannutv.blogspot.com') || 
@@ -46,16 +46,16 @@ class _CustomBannerAdState extends State<CustomBannerAd> {
               return NavigationDecision.navigate;
             }
 
-            // 2. 🔥 USER NE AD PE REAL TAP KIYA HAI TOH HI BROWSER ME KHOLO 🔥
+            // 2. 🔥 REAL TAP DETECTION 🔥
             if (_userTappedRecently) {
               _launchExternalBrowser(request.url);
-              return NavigationDecision.prevent; // Banner ke chhote dabbe me mat khulne do
+              return NavigationDecision.prevent; // Prevent loading inside the small banner iframe
             }
 
-            // 3. 🛡️ BINA TAP KE KUCH BHI HO, STRICTLY BLOCK!
+            // 3. 🛡️ BLOCK ALL UNPROMPTED AUTO-REDIRECTS
             return NavigationDecision.prevent; 
           },
-          // 🚀 WORLD CLASS ANTI-ADBLOCK SENSOR 🚀
+          // 🚀 WORLD CLASS ANTI-ADBLOCK SENSOR FOR BANNER 🚀
           onWebResourceError: (WebResourceError error) {
             final desc = error.description.toLowerCase();
             if (desc.contains('err_name_not_resolved') || 
