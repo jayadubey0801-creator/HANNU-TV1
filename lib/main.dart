@@ -173,22 +173,15 @@ class _SplashScreenState extends State<SplashScreen> {
       ));
       await remoteConfig.fetchAndActivate();
 
-      bool maintenance = remoteConfig.getBool('maintenance_mode');
-      String fbLatestVersion = remoteConfig.getString('latest_version').trim();
+      // Firebase se values fetch ho rahi hain, but abhi testing ke liye hum unhe ignore karenge
       String fbUpdateLink = remoteConfig.getString('update_link').trim();
       String fbMsg = remoteConfig.getString('maintenance_message').trim();
-      
-      PackageInfo packageInfo = await PackageInfo.fromPlatform();
-      String currentVersion = packageInfo.version.trim();
-
-      bool needsUpdate = false;
-      if (fbLatestVersion.isNotEmpty && currentVersion != fbLatestVersion) {
-         needsUpdate = true; 
-      }
 
       setState(() {
-        isMaintenance = maintenance;
-        isUpdateRequired = needsUpdate;
+        // 🔥 TESTING BYPASS: Isko false set kar diya taaki screen block na ho 🔥
+        isMaintenance = false; 
+        isUpdateRequired = false; 
+        
         if (fbUpdateLink.isNotEmpty) updateLink = fbUpdateLink;
         if (fbMsg.isNotEmpty) maintenanceMsg = fbMsg;
       });
@@ -196,46 +189,42 @@ class _SplashScreenState extends State<SplashScreen> {
       debugPrint("⚠️ Remote Config Error: $e");
     }
 
-    if (isMaintenance || isUpdateRequired) {
-      setState(() { isLoading = false; });
-    } else {
-      Timer(const Duration(milliseconds: 2500), () {
-        // 🔥 PERFECTLY WIRED: DashboardHooks connecting Modular Dashboard to VideoPlayerPage 🔥
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (context) => HannuDashboard(
-              hooks: DashboardHooks(
-                onOpenTitle: (ctx, TmdbItem item) {
-                  Navigator.push(
-                    ctx,
-                    MaterialPageRoute(
-                      builder: (_) => SkippableAdScreen(
-                        adDuration: 10,
-                        nextScreen: VideoPlayerPage(
-                          tmdbId: item.id,
-                          mediaType: item.isTv ? 'tv' : 'movie',
-                          movieTitle: item.title,
-                          overview: item.overview,
-                          rating: item.rating.toStringAsFixed(1),
-                          year: item.year,
-                        ),
+    // 🔥 TESTING BYPASS: Seedha Dashboard par bhej rahe hain 🔥
+    Timer(const Duration(milliseconds: 2500), () {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => HannuDashboard(
+            hooks: DashboardHooks(
+              onOpenTitle: (ctx, TmdbItem item) {
+                Navigator.push(
+                  ctx,
+                  MaterialPageRoute(
+                    builder: (_) => SkippableAdScreen(
+                      adDuration: 10,
+                      nextScreen: VideoPlayerPage(
+                        tmdbId: item.id,
+                        mediaType: item.isTv ? 'tv' : 'movie',
+                        movieTitle: item.title,
+                        overview: item.overview,
+                        rating: item.rating.toStringAsFixed(1),
+                        year: item.year,
                       ),
                     ),
-                  );
-                },
-                onOpenLiveTv: () {
-                  Navigator.push(
-                    context, 
-                    MaterialPageRoute(builder: (_) => const LiveTvChannelsPage())
-                  );
-                },
-              ),
+                  ),
+                );
+              },
+              onOpenLiveTv: () {
+                Navigator.push(
+                  context, 
+                  MaterialPageRoute(builder: (_) => const LiveTvChannelsPage())
+                );
+              },
             ),
-          ), 
-        );
-      });
-    }
+          ),
+        ), 
+      );
+    });
   }
 
   Future<void> _launchUpdateURL() async {
@@ -251,6 +240,7 @@ class _SplashScreenState extends State<SplashScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Yeh screen abhi kabhi show nahi hogi kyunki update bypass kar diya gaya hai
     if ((isMaintenance || isUpdateRequired) && !isLoading) {
       return Scaffold(
         backgroundColor: const Color(0xFF0F0F0F),
