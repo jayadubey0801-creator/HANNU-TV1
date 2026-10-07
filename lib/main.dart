@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:firebase_remote_config/firebase_remote_config.dart';
-import 'package:firebase_analytics/firebase_analytics.dart'; // 🚀 ADDED: Live Real-time Analytics
+import 'package:firebase_analytics/firebase_analytics.dart'; 
 import 'package:app_links/app_links.dart'; 
 import 'package:package_info_plus/package_info_plus.dart'; 
 import 'package:url_launcher/url_launcher.dart'; 
@@ -26,7 +26,7 @@ void main() async {
 
   // 🚀 LIVE ANALYTICS INITIALIZATION
   FirebaseAnalytics analytics = FirebaseAnalytics.instance;
-  analytics.logEvent(name: 'app_open_hannutv_v1_3_0'); // Updated version tracking
+  analytics.logEvent(name: 'app_open_hannutv_v1_3_0');
 
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
@@ -166,7 +166,6 @@ class _SplashScreenState extends State<SplashScreen> {
       ));
       await remoteConfig.fetchAndActivate();
 
-      // 🚀 DEEP FIX: Added .trim() so accidental spaces in Firebase don't break the app
       bool maintenance = remoteConfig.getBool('maintenance_mode');
       String fbLatestVersion = remoteConfig.getString('latest_version').trim();
       String fbUpdateLink = remoteConfig.getString('update_link').trim();
@@ -176,7 +175,6 @@ class _SplashScreenState extends State<SplashScreen> {
       String currentVersion = packageInfo.version.trim();
 
       bool needsUpdate = false;
-      // Exact Version Match Logic Check
       if (fbLatestVersion.isNotEmpty && currentVersion != fbLatestVersion) {
          needsUpdate = true; 
       }
@@ -185,13 +183,8 @@ class _SplashScreenState extends State<SplashScreen> {
         isMaintenance = maintenance;
         isUpdateRequired = needsUpdate;
         
-        if (fbUpdateLink.isNotEmpty) {
-           updateLink = fbUpdateLink;
-        }
-
-        if (fbMsg.isNotEmpty) {
-          maintenanceMsg = fbMsg;
-        }
+        if (fbUpdateLink.isNotEmpty) updateLink = fbUpdateLink;
+        if (fbMsg.isNotEmpty) maintenanceMsg = fbMsg;
       });
     } catch (e) {
       debugPrint("⚠️ Remote Config Error: $e");
@@ -203,15 +196,15 @@ class _SplashScreenState extends State<SplashScreen> {
       });
     } else {
       Timer(const Duration(milliseconds: 2500), () {
+        // 🔥 ERROR FIXED: Removed 'const' before DashboardPage() 🔥
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => const DashboardPage()), 
+          MaterialPageRoute(builder: (context) => DashboardPage()), 
         );
       });
     }
   }
 
-  // 🚀 DEEP FIX: Try-Catch applied to URL Launcher to prevent silent crashes
   Future<void> _launchUpdateURL() async {
     try {
       final Uri url = Uri.parse(updateLink);
