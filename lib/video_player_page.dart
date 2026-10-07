@@ -77,6 +77,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
   bool isDescriptionExpanded = false;
   Timer? _hideControlsTimer;
   Timer? _liveTvAdTimer; 
+  Timer? _fallbackPlayTimer; 
 
   bool showIntroAnimation = false;
   late AnimationController _introAnimController;
@@ -178,7 +179,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
     } catch (_) {}
   }
 
-  // 🔥 SHOW ACTOR MOVIES POPUP (TMDB/IMDB CONNECT) 🔥
+  // 🔥 SHOW ACTOR MOVIES POPUP (TMDB/IMDB CONNECT) WITH BUG FIX 🔥
   void _showActorMovies(int actorId, String actorName) {
     showModalBottomSheet(
       context: context, backgroundColor: const Color(0xFF151515), isScrollControlled: true,
@@ -303,7 +304,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
     try {
       await FirebaseFirestore.instance.collection('users').doc(user.uid).collection('watchlist').doc(widget.tmdbId.toString()).set({
         'id': widget.tmdbId, 'title': widget.movieTitle, 'mediaType': widget.mediaType,
-        'posterUrl': 'https://image.tmdb.org/t/p/w300', // Typically fetched, dummy to save structure
+        'posterUrl': 'https://image.tmdb.org/t/p/w300', 
         'timestamp': FieldValue.serverTimestamp(),
       });
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Added to Dashboard Watchlist!'), backgroundColor: Colors.green));
@@ -403,7 +404,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
           onPageFinished: (String url) {
             if (mounted) setState(() => isPageLoading = false);
 
-            // 🔥 4K SMOOTH VISUALS, AMBIENT GLOW & IFRAME HACK (UNTOUCHED CORE) 🔥
+            // 🔥 4K SMOOTH VISUALS, AMBIENT GLOW & IFRAME HACK (UNTOUCHED PROXY/IFRAME) 🔥
             String jsCode = '''
               document.documentElement.style.backgroundColor = 'transparent';
               document.body.style.backgroundColor = 'transparent';
@@ -446,7 +447,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                       glow.style.pointerEvents = 'none'; 
                       document.body.appendChild(glow);
                       
-                      // Keep clone synced
                       v.addEventListener('timeupdate', function() { glow.currentTime = v.currentTime; });
                   }
                   
@@ -502,7 +502,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
       final isTv = widget.mediaType == 'tv' || widget.mediaType == 'series';
       String targetUrl = isTv ? 'https://pantyflix.com/watch/play/tv/$id?season=$currentSeason&episode=$currentEpisode&server=$activeServer' : 'https://pantyflix.com/watch/play/movie/$id?server=$activeServer';
       
-      // STRICT VERCEL PROXY MAINTAINED
+      // 🔥 STRICT VERCEL PROXY MAINTAINED 🔥
       String vercelProxyBase = "https://hannutv-proxy-1.vercel.app/api/proxy?stream=";
       String safeFinalUrl = vercelProxyBase + Uri.encodeComponent(targetUrl);
       
@@ -620,6 +620,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
   void dispose() {
     _hideControlsTimer?.cancel(); 
     _liveTvAdTimer?.cancel(); 
+    _fallbackPlayTimer?.cancel();
     _introAnimController.dispose(); 
     commentInputController.dispose();
     SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]); SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual, overlays: SystemUiOverlay.values);
@@ -775,7 +776,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                         const SizedBox(height: 20),
                       ],
 
-                      // 🔥 DEEP CAST & CREW (ACTORS) 🔥
+                      // 🔥 DEEP CAST & CREW (ACTORS) FIX 🔥
                       if (widget.customUrl == null && castList.isNotEmpty) ...[
                         const Text("Cast & Crew", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
                         const SizedBox(height: 12),
@@ -791,7 +792,14 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                                   width: 70, margin: const EdgeInsets.only(right: 12),
                                   child: Column(
                                     children: [
-                                      CircleAvatar(radius: 30, backgroundImage: actor['profile_path'] != null ? CachedNetworkImageProvider('https://image.tmdb.org/t/p/w200${actor['profile_path']}') : const NetworkImage('https://via.placeholder.com/200'), backgroundColor: Colors.grey[900]),
+                                      // 🚀 ERROR FIXED HERE: "as ImageProvider" added
+                                      CircleAvatar(
+                                        radius: 30, 
+                                        backgroundImage: actor['profile_path'] != null 
+                                            ? CachedNetworkImageProvider('https://image.tmdb.org/t/p/w200${actor['profile_path']}') as ImageProvider
+                                            : const NetworkImage('https://via.placeholder.com/200'), 
+                                        backgroundColor: Colors.grey[900]
+                                      ),
                                       const SizedBox(height: 6),
                                       Text(actor['name'] ?? '', style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold), maxLines: 2, textAlign: TextAlign.center, overflow: TextOverflow.ellipsis),
                                     ],
