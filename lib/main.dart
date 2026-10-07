@@ -7,6 +7,7 @@ import 'package:firebase_analytics/firebase_analytics.dart'; // 🚀 ADDED: Live
 import 'package:app_links/app_links.dart'; 
 import 'package:package_info_plus/package_info_plus.dart'; 
 import 'package:url_launcher/url_launcher.dart'; 
+
 import 'dashboard.dart';
 import 'video_player_page.dart';
 
@@ -15,7 +16,7 @@ final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp();
-  print("🔥 Background Notification Hit: ${message.messageId}");
+  debugPrint("🔥 Background Notification Hit: ${message.messageId}");
 }
 
 void main() async {
@@ -25,7 +26,7 @@ void main() async {
 
   // 🚀 LIVE ANALYTICS INITIALIZATION
   FirebaseAnalytics analytics = FirebaseAnalytics.instance;
-  analytics.logEvent(name: 'app_open_hannutv_v1_0_1');
+  analytics.logEvent(name: 'app_open_hannutv_v1_3_0'); // Updated version tracking
 
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
@@ -47,11 +48,11 @@ void main() async {
   );
 
   FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-    print('🔥 Foreground Notification Hit!');
+    debugPrint('🔥 Foreground Notification Hit!');
   });
 
   messaging.getToken().then((token) {
-    print("📲 FIREBASE DEVICE TOKEN: $token");
+    debugPrint("📲 FIREBASE DEVICE TOKEN: $token");
   });
 
   runApp(const HannuTvApp());
@@ -87,7 +88,7 @@ class _HannuTvAppWrapperState extends State<HannuTvAppWrapper> {
     try {
       final initialUri = await _appLinks.getInitialLink();
       if (initialUri != null) _handleDeepLink(initialUri);
-    } catch (e) { print(e); }
+    } catch (e) { debugPrint(e.toString()); }
 
     _sub = _appLinks.uriLinkStream.listen((Uri? uri) {
       if (uri != null) _handleDeepLink(uri);
@@ -193,7 +194,7 @@ class _SplashScreenState extends State<SplashScreen> {
         }
       });
     } catch (e) {
-      print("⚠️ Remote Config Error: $e");
+      debugPrint("⚠️ Remote Config Error: $e");
     }
 
     if (isMaintenance || isUpdateRequired) {
@@ -204,7 +205,7 @@ class _SplashScreenState extends State<SplashScreen> {
       Timer(const Duration(milliseconds: 2500), () {
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => DashboardPage()), 
+          MaterialPageRoute(builder: (context) => const DashboardPage()), 
         );
       });
     }
@@ -215,10 +216,10 @@ class _SplashScreenState extends State<SplashScreen> {
     try {
       final Uri url = Uri.parse(updateLink);
       if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
-        print('Could not launch $url');
+        debugPrint('Could not launch $url');
       }
     } catch (e) {
-      print('URL Launch Error: $e');
+      debugPrint('URL Launch Error: $e');
     }
   }
 
