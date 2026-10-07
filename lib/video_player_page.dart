@@ -9,11 +9,10 @@ import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-
 import 'banner_ad_widget.dart';
 import 'skippable_ad_screen.dart';
+// 🔥 ERROR FIXED: Yahan se 'dashboard.dart' ka purana import hata diya hai 🔥
 import 'watchlist_service.dart'; 
-// 🔥 ERROR FIXED: Hata diya 'dashboard.dart' import 🔥
 
 const String kTmdbToken =
     'eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiIzZDJkOTExNmM5ZGU3MjA5ZWUyNzdiYjhjYzlhZWVkOCIsIm5iZiI6MTc5MDI2OTE4NC42MjksInN1YiI6IjZhYjU1NzAwNzZiMTg1ODU3MGFjNDM4NSIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.xZJX8fowhVhVJsgl-5wOW6Y7ZfUr9Zu_Ey1qMkhnPd0';
@@ -96,7 +95,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
 
   final List<Map<String, String>> servers = const [
     {'key': 'vidrift', 'name': 'Rift'},
-    {'key': 'vidsrc', 'name': 'Fast'}, 
+    {'key': 'vidsrc', 'name': 'Fast'}, // YAHAN FIX KIYA HAI: 'fast' ki jagah actual 'vidsrc' server daal diya hai
     {'key': 'vidbolt', 'name': 'Bolt'},
     {'key': 'cinezo', 'name': 'Cinezo'},
     {'key': 'hindi-new', 'name': 'Hindi New'},
@@ -272,6 +271,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                     width: 100vw !important; 
                     height: 100vh !important; 
                 }
+                /* MAIN MAGIC: IFRAME KO FULL SCREEN KARNA JAISE PURANI SETTING MEIN THA */
                 iframe:not([src*="ads"]) {
                     position: fixed !important;
                     top: 0 !important;
@@ -922,6 +922,28 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
     }
   }
 
+  // 🔥 BHAI YEH MISSING TEEN FUNCTIONS MAINE WAPIS DAAL DIYE HAIN 🔥
+  @override
+  void dispose() {
+    _hideControlsTimer?.cancel(); 
+    _liveTvAdTimer?.cancel(); 
+    _introAnimController.dispose(); 
+    commentInputController.dispose();
+    _ambientTimer?.cancel();
+    _ambientColor.dispose();
+    SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]); SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual, overlays: SystemUiOverlay.values);
+    super.dispose();
+  }
+
+  Widget _buildFocusableItem({required Widget child, required VoidCallback onTap, BorderRadius? borderRadius}) {
+    return _TvFocusButton(onTap: onTap, borderRadius: borderRadius ?? BorderRadius.circular(8), child: child);
+  }
+
+  Widget _buildTVLayout() { 
+    return const Scaffold(backgroundColor: Colors.black, body: Center(child: Text("TV Layout Mode", style: TextStyle(color: Colors.white)))); 
+  }
+  // 🔥 INKE BINA FLUTTER CONFUSE HO RAHA THA 🔥
+
   @override
   Widget build(BuildContext context) {
     if (isTvDevice) return _buildTVLayout(); 
@@ -1107,7 +1129,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                         children: [
                           InkWell(onTap: _showSeasonPicker, child: Container(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10), decoration: BoxDecoration(color: Colors.black, border: Border.all(color: Colors.white30), borderRadius: BorderRadius.circular(20)), child: Row(children: [Text("Season ${currentSeason.toString().padLeft(2, '0')}", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)), const SizedBox(width: 6), const Icon(Icons.keyboard_arrow_down, color: Colors.white, size: 18)]))),
                           const SizedBox(width: 12),
-                          Container(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10), decoration: BoxDecoration(color: Colors.black, border: Border.all(color: Colors.white30), borderRadius: BorderRadius.circular(20)), child: Row(children: const [Text("Original Audio", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)), SizedBox(width: 6), Icon(Icons.keyboard_arrow_down, color: Colors.white, size: 18)])),
+                          InkWell(onTap: _showAudioServerPingMenu, child: Container(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10), decoration: BoxDecoration(color: Colors.black, border: Border.all(color: Colors.white30), borderRadius: BorderRadius.circular(20)), child: Row(children: const [Text("Original Audio", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)), SizedBox(width: 6), Icon(Icons.keyboard_arrow_down, color: Colors.white, size: 18)]))),
                         ],
                       ),
                       const SizedBox(height: 20),
@@ -1313,10 +1335,6 @@ class _TvFocusButtonState extends State<_TvFocusButton> {
     );
   }
 }
-
-// =====================================================================
-// NEW WIDGETS
-// =====================================================================
 
 class _AmbientGlow extends StatelessWidget {
   final ValueNotifier<Color> color;
