@@ -14,7 +14,8 @@ import 'package:cached_network_image/cached_network_image.dart';
 
 import 'banner_ad_widget.dart';
 import 'skippable_ad_screen.dart';
-import 'watchlist_service.dart'; 
+import 'stores.dart'; 
+import 'tmdb_service.dart';
 
 const String kTmdbToken =
     'eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiIzZDJkOTExNmM5ZGU3MjA5ZWUyNzdiYjhjYzlhZWVkOCIsIm5iZiI6MTc5MDI2OTE4NC42MjksInN1YiI6IjZhYjU1NzAwNzZiMTg1ODU3MGFjNDM4NSIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.xZJX8fowhVhVJsgl-5wOW6Y7ZfUr9Zu_Ey1qMkhnPd0';
@@ -154,7 +155,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
     }
 
     _checkDeviceType();
-    WatchlistService.instance.ensureLoaded();
+    WatchlistStore.I.load();
     _startAmbientCycle(); 
   }
 
@@ -260,11 +261,13 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
               style.innerHTML = `
                 header, nav, .navbar, footer, .footer, .server-select, .logo, a[href*="t.me"], a[href="/"],
                 iframe[src*="ads"], .ad-container, .ads, .popup-overlay, .dmca-notice, h1, h2, h3,
-                .human-verify, #captcha, [class*="verify"] { 
+                .human-verify, #captcha, [class*="verify"],
+                .ad-box, .ad-slot, [id*="ad-"], [class*="ad-"], [id*="banner"], [class*="banner"], [id*="popup"], [class*="popup"] { 
                     display: none !important; 
                     opacity: 0 !important; 
                     pointer-events: none !important; 
                     visibility: hidden !important; 
+                    z-index: -1 !important;
                 }
                 body, html { 
                     background-color: #000000 !important; 
@@ -331,7 +334,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
           },
           onNavigationRequest: (NavigationRequest request) {
             final url = request.url.toLowerCase();
-            if (url.contains('doubleclick') || url.contains('popads') || url.contains('1xbet') || url.contains('bet365') || url.contains('onclick') || url.contains('adult') || url.contains('telegram') || url.contains('t.me') || url.contains('adsterra') || url.contains('captcha') || url.contains('verify')) {
+            if (url.contains('doubleclick') || url.contains('popads') || url.contains('1xbet') || url.contains('bet365') || url.contains('onclick') || url.contains('adult') || url.contains('telegram') || url.contains('t.me') || url.contains('adsterra') || url.contains('captcha') || url.contains('verify') || url.contains('ads') || url.contains('tracker')) {
                 return NavigationDecision.prevent;
             }
             if (url.contains('pantyflix.com') || url.contains('vercel.app') || url.contains('vidbolt') || url.contains('vidsrc') || url.contains('vidlink') || url.contains('multiembed') || url.contains('autoembed') || url.startsWith('about:blank') || url.startsWith('data:')) {
@@ -463,7 +466,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
     );
   }
 
-  // 🔥 ERROR FIXED: YEH WOH MISSING FUNCTION HAI JO CHHUT GAYA THA 🔥
   void _showAudioServerPingMenu() {
     showModalBottomSheet(
       context: context, backgroundColor: const Color(0xFF151515),
@@ -662,38 +664,24 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
     });
   }
 
-  Future<String> _posterUrlForWatchlist() async {
-    String path = '';
-    final Map<String, dynamic>? d = details;
-    if (d != null && d['poster_path'] is String) path = d['poster_path'] as String;
-    if (path.isEmpty) {
-      try {
-        final res = await http
-            .get(Uri.parse('https://hannu-tv.hritikmishra862.workers.dev/3/$_tmdbType/${widget.tmdbId}?language=en-US'), headers: kApiHeaders)
-            .timeout(const Duration(seconds: 6));
-        if (res.statusCode == 200) {
-          final data = json.decode(res.body);
-          if (data is Map && data['poster_path'] is String) path = data['poster_path'] as String;
-        }
-      } catch (_) {}
-    }
-    return path.isNotEmpty ? 'https://image.tmdb.org/t/p/w500$path' : '';
-  }
-
   Future<void> _toggleWatchlist() async {
-    final bool already = WatchlistService.instance.contains(widget.tmdbId, _tmdbType);
     final String fetchedOverview = (details?['overview'] ?? '').toString();
-    final Map<String, dynamic> item = <String, dynamic>{
-      'id': widget.tmdbId,
-      'mediaType': _tmdbType,
-      'title': widget.movieTitle,
-      'year': widget.year,
-      'rating': widget.rating,
-      'overview': widget.overview.isNotEmpty ? widget.overview : fetchedOverview,
-      'posterUrl': already ? '' : await _posterUrlForWatchlist(),
-    };
-    final bool added = await WatchlistService.instance.toggle(item);
+    final TmdbItem item = TmdbItem(
+      id: widget.tmdbId,
+      isTv: widget.mediaType == 'tv' || widget.mediaType == 'series',
+      title: widget.movieTitle,
+      overview: widget.overview.isNotEmpty ? widget.overview : fetchedOverview,
+      year: widget.year,
+      lang: 'en',
+      poster: details?['poster_path'] as String?,
+      backdrop: details?['backdrop_path'] as String?,
+      rating: double.tryParse(widget.rating) ?? 0.0,
+      popularity: 0.0,
+      genreIds: [],
+    );
+    await WatchlistStore.I.toggle(item);
     if (!mounted) return;
+    final bool added = WatchlistStore.I.contains(item);
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -1083,10 +1071,16 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                       child: Row(
                         children: [
                           if (widget.customUrl == null) ...[
-                            ValueListenableBuilder<List<Map<String, dynamic>>>(
-                              valueListenable: WatchlistService.instance.items,
-                              builder: (context, list, _) {
-                                final bool saved = WatchlistService.instance.contains(widget.tmdbId, _tmdbType);
+                            AnimatedBuilder(
+                              animation: WatchlistStore.I,
+                              builder: (context, _) {
+                                final TmdbItem tempItem = TmdbItem(
+                                  id: widget.tmdbId,
+                                  isTv: widget.mediaType == 'tv' || widget.mediaType == 'series',
+                                  title: widget.movieTitle,
+                                  overview: '', year: '', lang: '', poster: null, backdrop: null, rating: 0.0, popularity: 0.0, genreIds: []
+                                );
+                                final bool saved = WatchlistStore.I.contains(tempItem);
                                 return _buildFocusableItem(
                                   onTap: _toggleWatchlist,
                                   borderRadius: BorderRadius.circular(20),

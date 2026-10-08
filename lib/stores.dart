@@ -195,6 +195,7 @@ class AppNotification {
   final String title;
   final String body;
   final String? url;
+  final String? image;
   final int ts;
   const AppNotification({
     required this.id,
@@ -202,16 +203,18 @@ class AppNotification {
     required this.body,
     required this.ts,
     this.url,
+    this.image,
   });
 
   Map<String, dynamic> toJson() =>
-      <String, dynamic>{'id': id, 'title': title, 'body': body, 'url': url, 'ts': ts};
+      <String, dynamic>{'id': id, 'title': title, 'body': body, 'url': url, 'image': image, 'ts': ts};
 
   factory AppNotification.fromJson(Map<String, dynamic> j) => AppNotification(
         id: (j['id'] ?? '').toString(),
         title: (j['title'] ?? '').toString(),
         body: (j['body'] ?? '').toString(),
         url: j['url'] as String?,
+        image: j['image'] as String?,
         ts: (j['ts'] as num?)?.toInt() ?? 0,
       );
 
@@ -221,12 +224,14 @@ class AppNotification {
     if (title.isEmpty && body.isEmpty) return null;
     final int ts = (m.sentTime ?? DateTime.now()).millisecondsSinceEpoch;
     final String? url = (m.data['url'] ?? m.data['link'])?.toString();
+    final String? image = (m.notification?.android?.imageUrl ?? m.notification?.apple?.imageUrl ?? m.data['image'])?.toString();
     return AppNotification(
       id: m.messageId ?? '${ts}_$title',
       title: title.isEmpty ? 'HANNUTV' : title,
       body: body,
       ts: ts,
       url: url,
+      image: image,
     );
   }
 }
@@ -319,6 +324,11 @@ class NotificationStore extends ChangeNotifier {
     _inited = true;
     await _reload();
     try {
+      await FirebaseMessaging.instance.setForegroundNotificationPresentationOptions(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
       FirebaseMessaging.onMessage.listen(_onMessage);
       FirebaseMessaging.onMessageOpenedApp.listen(_onMessage);
       final RemoteMessage? first = await FirebaseMessaging.instance.getInitialMessage();
