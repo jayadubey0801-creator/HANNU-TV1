@@ -1,21 +1,20 @@
 import 'package:flutter/material.dart';
 
 // ─────────────────────────────────────────────────────────────
-//  🔑 TMDB v3 API KEY
-//  Ya to neeche paste karo, ya build me:  --dart-define=TMDB_API_KEY=xxxxxxxx
+//  🔑 TMDB v3 API KEY (ERROR FIXED: Asli Key Daal Di Hai)
 // ─────────────────────────────────────────────────────────────
 const String kTmdbApiKey = String.fromEnvironment(
   'TMDB_API_KEY',
-  defaultValue: 'PASTE_YOUR_TMDB_API_KEY_HERE',
+  defaultValue: '3d2d9116c9de7209ee277bb8cc9aeed8', // 🔥 TERA ASLI API KEY YAHAN ADD KAR DIYA HAI 🔥
 );
 bool get tmdbKeyMissing => kTmdbApiKey.startsWith('PASTE_');
 
 const String kImg = 'https://image.tmdb.org/t/p';
 
 // 🔗 Support + update links (apne asli links yaha daalo)
-const String kTelegramUrl = 'https://t.me/YOUR_TELEGRAM_LINK';
-const String kWhatsappChannelUrl = 'https://whatsapp.com/channel/YOUR_CHANNEL_LINK';
-const String kUpdateUrlFallback = 'https://YOUR_HANNUTV_DOWNLOAD_LINK';
+const String kTelegramUrl = 'https://t.me/HANNUTV';
+const String kWhatsappChannelUrl = 'https://whatsapp.com/channel/0029VbE2Pb17z4kmfjF04P0v';
+const String kUpdateUrlFallback = 'https://hannutv.blogspot.com/';
 const String kVersionFallback = '1.3.0';
 
 /// Theme tokens (AniStation reference jaisa dark-navy + purple)
