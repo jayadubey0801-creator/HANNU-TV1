@@ -96,17 +96,18 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
   Timer? _ambientTimer;
 
   final List<Map<String, String>> servers = const [
-    {'key': 'vidrift', 'name': 'Rift'},
-    {'key': 'vidsrc', 'name': 'Fast'}, 
-    {'key': 'vidbolt', 'name': 'Bolt'},
-    {'key': 'cinezo', 'name': 'Cinezo'},
-    {'key': 'hindi-new', 'name': 'Hindi New'},
-    {'key': 'peach', 'name': 'Peach'},
-    {'key': 'mega', 'name': 'Mega'},
-    {'key': 'alpha', 'name': 'Alpha'},
-    {'key': 'orion', 'name': 'Orion'},
-    {'key': 'hindi', 'name': 'Hindi'},
-    {'key': 'vidgod', 'name': 'Vidgod'},
+    {'key': 'vidrift', 'name': 'Rift'},          
+    {'key': 'bingr', 'name': 'Fast'},           
+    {'key': 'vidcore', 'name': 'Fast (Ads)'},   
+    {'key': 'vidbolt', 'name': 'Bolt'},           
+    {'key': 'cinezo', 'name': 'Cinezo'},          
+    {'key': 'peachify', 'name': 'Peach'},       
+    {'key': 'vidlink', 'name': 'Mega'},           
+    {'key': 'vidfast', 'name': 'Alpha'},          
+    {'key': 'vidrock', 'name': 'Orion'},         
+    {'key': 'hindi-new', 'name': 'Hindi New'},   
+    {'key': 'screenscape', 'name': 'Hindi'},      
+    {'key': 'zxcstream', 'name': 'Vidgod'},      
     {'key': 'cinesrc', 'name': 'CineSrc'},
   ];
 
