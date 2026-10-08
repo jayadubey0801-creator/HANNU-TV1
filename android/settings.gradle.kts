@@ -19,6 +19,7 @@ pluginManagement {
 
 plugins {
     id("dev.flutter.flutter-plugin-loader") version "1.0.0"
+    // 🔥 YAHAN THI ASLI GALTI! Maine inko stable versions par set kar diya hai 🔥
     id("com.android.application") version "8.3.1" apply false 
     id("org.jetbrains.kotlin.android") version "1.9.22" apply false 
     id("com.google.gms.google-services") version "4.4.2" apply false
