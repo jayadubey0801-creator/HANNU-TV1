@@ -1,18 +1,22 @@
 plugins {
     id("com.android.application")
-    id("org.jetbrains.kotlin.android") // 🔥 Yahan Kotlin explicitly add kiya taaki conflict na ho 🔥
+    id("org.jetbrains.kotlin.android")
     id("dev.flutter.flutter-gradle-plugin")
     id("com.google.gms.google-services")
 }
 
 android {
     namespace = "com.example.onyxtube"
-    compileSdk = 34 // 🔥 Isko 34 hi rakhna sabse stable hai 🔥
+    compileSdk = 34 
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = "17"
     }
 
     defaultConfig {
@@ -27,13 +31,6 @@ android {
         release {
             signingConfig = signingConfigs.getByName("debug")
         }
-    }
-}
-
-kotlin {
-    jvmToolchain(17) // 🔥 YAHI HAI MASTER FIX: Java 25 ki jagah strictly Java 17 force karega 🔥
-    compilerOptions {
-        jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17
     }
 }
 
