@@ -7,7 +7,7 @@ plugins {
 
 android {
     namespace = "com.example.onyxtube"
-    compileSdk = 34 
+    compileSdk = 35
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
@@ -21,10 +21,11 @@ android {
 
     defaultConfig {
         applicationId = "com.example.onyxtube"
-        minSdk = flutter.minSdkVersion
-        targetSdk = 34
+        minSdk = 23
+        targetSdk = 35
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        multiDexEnabled = true
     }
 
     buildTypes {
@@ -32,12 +33,6 @@ android {
             signingConfig = signingConfigs.getByName("debug")
         }
     }
-}
-
-// 🔥 YAHAN HAI MASTER FIX JO TUNE PICHHLI BAAR MISS KAR DIYA THA 🔥
-// Ye code Gradle ko strictly rok dega Java 25 download karne se!
-kotlin {
-    jvmToolchain(17)
 }
 
 flutter {
