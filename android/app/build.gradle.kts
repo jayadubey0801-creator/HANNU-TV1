@@ -34,6 +34,12 @@ android {
     }
 }
 
+// 🔥 YAHAN HAI MASTER FIX JO TUNE PICHHLI BAAR MISS KAR DIYA THA 🔥
+// Ye code Gradle ko strictly rok dega Java 25 download karne se!
+kotlin {
+    jvmToolchain(17)
+}
+
 flutter {
     source = "../.."
 }
