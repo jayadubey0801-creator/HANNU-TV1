@@ -8,14 +8,20 @@ plugins {
 android {
     namespace = "com.example.onyxtube"
     compileSdk = flutter.compileSdkVersion
-    ndkVersion = flutter.ndkVersion
+
+    // Firebase, Google Sign-In, OneSignal आदि plugins के लिए required NDK
+    ndkVersion = "27.0.12077973"
 
     defaultConfig {
         applicationId = "com.example.onyxtube"
-        minSdk = flutter.minSdkVersion
+
+        // firebase_analytics minimum Android API 23 मांगता है
+        minSdk = 23
+
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+
         multiDexEnabled = true
     }
 
@@ -26,6 +32,7 @@ android {
 
     buildTypes {
         release {
+            // अभी release APK debug key से sign होगा
             signingConfig = signingConfigs.getByName("debug")
         }
     }
