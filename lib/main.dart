@@ -27,16 +27,17 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await Firebase.initializeApp();
-
-  FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
-
+  // 🔥 YAHAN MAINE FIREBASE KO SAFE TRY-CATCH MEIN DAAL DIYA HAI 🔥
+  // Ab app kisi bhi condition mein startup par crash nahi hogi.
   try {
+    await Firebase.initializeApp();
+    FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+
     final FirebaseRemoteConfig remoteConfig = FirebaseRemoteConfig.instance;
 
     await remoteConfig.setConfigSettings(
       RemoteConfigSettings(
-        fetchTimeout: const Duration(minutes: 1),
+        fetchTimeout: const Duration(seconds: 15), // Timeout fast kar diya taaki app jaldi khule
         minimumFetchInterval: const Duration(hours: 1),
       ),
     );
@@ -50,7 +51,7 @@ Future<void> main() async {
 
     await remoteConfig.fetchAndActivate();
   } catch (error) {
-    debugPrint('Remote Config setup error: $error');
+    debugPrint('Firebase Startup error (Ignored for safe boot): $error');
   }
 
   runApp(const HannuApp());
@@ -201,8 +202,6 @@ class _HannuAppState extends State<HannuApp> {
 
 /// -------------------------------------------------------------------------
 /// HOME DASHBOARD
-/// यह class पहले आपके project में missing थी।
-/// अब HannuDashboard() error नहीं आएगा।
 class HannuDashboard extends StatefulWidget {
   const HannuDashboard({
     super.key,
@@ -219,8 +218,6 @@ class _HannuDashboardState extends State<HannuDashboard> {
   @override
   void initState() {
     super.initState();
-
-    // PosterCard और बाकी dashboard widgets इन hooks को इस्तेमाल करेंगे।
     Hooks.cfg = widget.hooks;
   }
 
@@ -683,8 +680,7 @@ class _LiveTvScreenState extends State<LiveTvScreen> {
                 )
               : GridView.builder(
                   padding: const EdgeInsets.all(12),
-                  gridDelegate:
-                      const SliverGridDelegateWithFixedCrossAxisCount(
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 3,
                     crossAxisSpacing: 12,
                     mainAxisSpacing: 12,
@@ -737,8 +733,7 @@ class _LiveTvScreenState extends State<LiveTvScreen> {
                                     ? CachedNetworkImage(
                                         imageUrl: logo,
                                         fit: BoxFit.contain,
-                                        errorWidget: (_, __, ___) =>
-                                            const Icon(
+                                        errorWidget: (_, __, ___) => const Icon(
                                           Icons.tv,
                                           color: Colors.white54,
                                           size: 40,
